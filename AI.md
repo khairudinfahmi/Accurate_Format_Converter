@@ -80,7 +80,7 @@ for f in glob.glob(os.path.join(site_packages, '*__mypyc*.pyd')):
 Tanpa kode ini, aplikasi akan *crash* `ModuleNotFoundError` di komputer user.
 
 ### C. Digital Signing
-Gunakan sertifikat `assets\khairudinfahmi.pfx` dengan password `rensa2026`. File utama dan file Installer (`Output\Accurate_Converter_Setup_v4.0.exe` dari Inno Setup) **HARUS** di-sign.
+Gunakan sertifikat *Self-Signed* `assets\khairudinfahmi.pfx` dengan password `rensa2026`. File utama dan file Installer (`Output\Accurate_Converter_Setup_v4.0.exe` dari Inno Setup) **HARUS** di-sign.
 
 ---
 

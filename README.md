@@ -30,5 +30,3 @@ Kalau mau ikut ngembangin atau sekadar lihat-lihat kodenya, wajib banget baca do
 2. **[`BUILD_GUIDE.md`](./BUILD_GUIDE.md)**: Cara nge-build aplikasi ini jadi `.exe` yang ringan dan cara nambahin *Self-Signed Signature* (menggunakan file `.pfx`).
 3. **[`AI.md`](./AI.md)**: Panduan arsitektur aplikasi buat referensi cepat.
 
----
-*Dibuat oleh **Khairudin Fahmi**.*
