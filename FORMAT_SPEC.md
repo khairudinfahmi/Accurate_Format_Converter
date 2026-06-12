@@ -395,8 +395,8 @@ dengan template import Accurate Online.
 
 ## Catatan Akhir
 
-Dokumen ini dibuat berdasarkan kode yang sudah 100% terverifikasi dan cocok
-dengan template import Accurate Online per tanggal 21 Mei 2026.
+Dokumen ini dibuat berdasarkan kode versi 4.0.0 yang sudah 100% terverifikasi dan cocok
+dengan template import Accurate Online per tanggal 12 Juni 2026.
 
 Jika ada AI atau developer lain yang diminta mengubah kode, WAJIB baca
 dokumen ini terlebih dahulu dan JANGAN mengubah format output tanpa
