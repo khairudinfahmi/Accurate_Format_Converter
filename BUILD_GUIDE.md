@@ -38,8 +38,8 @@ Copy-Item version.txt dist\version.txt -Force
 ---
 
 ## 4. Digital Signing Tahap 1 (Aplikasi)
-Aplikasi harus ditandatangani untuk mencegah blokir dari Windows Defender dan SmartScreen.
-Jalankan Signtool untuk kedua aplikasi `.exe` yang baru saja di-build:
+Aplikasi bisa ditandatangani menggunakan *Self-Signed Certificate* (.pfx) untuk menyematkan identitas Anda selaku *developer* pada file *executable*.
+Meskipun sifatnya *self-signed*, ini langkah baik agar *file* terlihat lebih profesional. Jalankan `signtool` untuk kedua aplikasi `.exe` yang baru saja di-build:
 ```powershell
 & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" sign /f "assets\khairudinfahmi.pfx" /p rensa2026 /fd SHA256 /t http://timestamp.digicert.com "dist\Accurate_Format_Converter.exe" "dist\Launcher.exe"
 ```

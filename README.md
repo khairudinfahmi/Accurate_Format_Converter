@@ -27,7 +27,7 @@ Buat yang cuma mau pakai aplikasinya langsung:
 
 Kalau mau ikut ngembangin atau sekadar lihat-lihat kodenya, wajib banget baca dokumen-dokumen ini dulu biar nggak bingung:
 1. **[`FORMAT_SPEC.md`](./FORMAT_SPEC.md)**: Ini panduan utama soal gimana struktur kolomnya dibikin biar Accurate nggak nolak pas di-import.
-2. **[`BUILD_GUIDE.md`](./BUILD_GUIDE.md)**: Cara nge-build aplikasi ini jadi `.exe` yang ringan dan cara nambahin *Digital Signature*.
+2. **[`BUILD_GUIDE.md`](./BUILD_GUIDE.md)**: Cara nge-build aplikasi ini jadi `.exe` yang ringan dan cara nambahin *Self-Signed Signature* (menggunakan file `.pfx`).
 3. **[`AI.md`](./AI.md)**: Panduan arsitektur aplikasi buat referensi cepat.
 
 ---
