@@ -161,49 +161,12 @@ class LauncherApp:
             if is_exe_installer:
                 self.update_ui("Memasang pembaruan secara otomatis...", 100)
                 
-                ps_script_path = os.path.join(temp_dir, "install_update_exe.ps1")
-                
-                # PowerShell script to cleanly close running instances, run silent installer to exact current folder, and restart launcher
-                ps_code = f"""
-Add-Type -AssemblyName PresentationFramework
-$logPath = "$env:TEMP\\update_exe_debug.log"
-"Mulai proses update EXE..." | Out-File $logPath
-
-try {{
-    "Mematikan aplikasi lama..." | Out-File $logPath -Append
-    Stop-Process -Name "Accurate_Format_Converter", "Launcher" -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
-
-    "Menjalankan installer silang ke folder berjalan..." | Out-File $logPath -Append
-    $installerArgs = '/VERYSILENT /SUPPRESSMSGBOXES /FORCECLOSEAPPLICATIONS /NORESTART /DIR="{self.exe_dir}"'
-    $process = Start-Process -FilePath "{download_dest}" -ArgumentList $installerArgs -Wait -PassThru -ErrorAction Stop
-
-    "Installer selesai dengan exit code: $($process.ExitCode)" | Out-File $logPath -Append
-    
-    "Membersihkan installer..." | Out-File $logPath -Append
-    Remove-Item -Path "{download_dest}" -Force -ErrorAction SilentlyContinue
-
-    [System.Windows.MessageBox]::Show("Pembaruan Berhasil Dipasang! Aplikasi akan dimuat ulang.", "Update Sukses", 0, [System.Windows.MessageBoxImage]::Information)
-
-    "Menjalankan aplikasi baru..." | Out-File $logPath -Append
-    Start-Process -FilePath "{os.path.join(self.exe_dir, 'Launcher.exe')}"
-}} catch {{
-    $err = $_.Exception.Message
-    "ERROR: $err" | Out-File $logPath -Append
-    [System.Windows.MessageBox]::Show("Gagal memasang update! Error: $err", "Update Gagal", 0, [System.Windows.MessageBoxImage]::Error)
-}} finally {{
-    Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue
-}}
-"""
-                with open(ps_script_path, "w", encoding="utf-8") as f:
-                    f.write(ps_code)
-                
-                # Run PowerShell script as Administrator via ctypes ShellExecuteW API
                 import ctypes
+                installer_args = f'/VERYSILENT /SUPPRESSMSGBOXES /FORCECLOSEAPPLICATIONS /NORESTART /DIR="{self.exe_dir}"'
                 ctypes.windll.shell32.ShellExecuteW(
-                    None, "runas", "powershell.exe", 
-                    f'-ExecutionPolicy Bypass -WindowStyle Hidden -File "{ps_script_path}"', 
-                    "", 0
+                    None, "open", download_dest, 
+                    installer_args, 
+                    "", 1
                 )
                 self.root.after(0, self.root.destroy)
                 return
