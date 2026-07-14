@@ -203,7 +203,6 @@ class LauncherApp:
             
             # Membuat skrip PowerShell untuk menimpa file dengan hak akses Administrator (UAC)
             ps_script_path = os.path.join(temp_dir, "install_update.ps1")
-            vbs_script_path = os.path.join(temp_dir, "run_update.vbs")
             
             # Skrip PowerShell dengan penanganan galat dan terminasi paksa
             ps_code = f"""
