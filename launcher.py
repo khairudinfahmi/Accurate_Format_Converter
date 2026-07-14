@@ -27,6 +27,7 @@ def resource_path(relative_path):
 
 def get_local_version():
     try:
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
         # Mendapatkan path versi lokal dari direktori eksekusi aplikasi
         exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         v_path = os.path.join(exe_dir, "version.txt")
@@ -202,6 +203,7 @@ class LauncherApp:
             
             # Membuat skrip PowerShell untuk menimpa file dengan hak akses Administrator (UAC)
             ps_script_path = os.path.join(temp_dir, "install_update.ps1")
+            vbs_script_path = os.path.join(temp_dir, "run_update.vbs")
             
             # Skrip PowerShell dengan penanganan galat dan terminasi paksa
             ps_code = f"""
