@@ -81,7 +81,11 @@ for f in glob.glob(os.path.join(site_packages, '*__mypyc*.pyd')):
 ```
 Tanpa kode ini, aplikasi akan *crash* `ModuleNotFoundError` di komputer user.
 
-### C. Digital Signing
+### Deployment / Build
+- **Wajib menggunakan script `build_all.ps1`**. JANGAN PERNAH menyuruh pengguna menjalankan PyInstaller, signtool, atau Inno Setup compiler (ISCC) secara manual. Script sakti ini sudah meng-handle semuanya secara otomatis.
+- File installer selalu dihasilkan di folder `Output/`.
+
+### Aturan Keamanan (Digital Signature)
 Gunakan sertifikat *Self-Signed* `assets\khairudinfahmi.pfx` dengan password `rensa2026`. File utama dan file Installer (`Output\Accurate_Converter_Setup_v4.1.exe` dari Inno Setup) **HARUS** di-sign.
 
 ---

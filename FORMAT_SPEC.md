@@ -35,6 +35,7 @@ Accurate_Format_Converter/
 |-- accurate_format_converter.spec   # PyInstaller spec (App utama)
 |-- launcher.spec                    # PyInstaller spec (Launcher)
 |-- accurate_converter_installer.iss # Inno Setup script
+|-- build_all.ps1                    # Skrip build otomatis (PyInstaller + InnoSetup + Digital Sign)
 |-- BUILD_GUIDE.md                   # Panduan build & rilis
 |-- assets/
 |   |-- rensa_logo.ico               # Icon aplikasi
