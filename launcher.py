@@ -82,7 +82,12 @@ class LauncherApp:
     def launch_main_app(self):
         target_exe = os.path.join(self.exe_dir, MAIN_APP_EXE)
         if os.path.exists(target_exe):
-            subprocess.Popen([target_exe], cwd=self.exe_dir)
+            # Clean PyInstaller environment variables for the child process to prevent initialization crash
+            child_env = os.environ.copy()
+            for key in list(child_env.keys()):
+                if key.startswith("_MEIPASS") or key.startswith("_PYI_"):
+                    child_env.pop(key, None)
+            subprocess.Popen([target_exe], cwd=self.exe_dir, env=child_env)
         else:
             messagebox.showerror("Error", f"Aplikasi utama ({MAIN_APP_EXE}) tidak ditemukan di folder ini!")
         self.root.after(0, self.root.destroy)
@@ -161,6 +166,12 @@ class LauncherApp:
             if is_exe_installer:
                 self.update_ui("Memasang pembaruan secara otomatis...", 100)
                 
+                # Clear PyInstaller environment variables before spawning installer
+                # to prevent the installer and its child launcher from inheriting them
+                for key in list(os.environ.keys()):
+                    if key.startswith("_MEIPASS") or key.startswith("_PYI_"):
+                        os.environ.pop(key, None)
+                
                 import ctypes
                 installer_args = f'/VERYSILENT /SUPPRESSMSGBOXES /FORCECLOSEAPPLICATIONS /NORESTART /DIR="{self.exe_dir}"'
                 ctypes.windll.shell32.ShellExecuteW(
@@ -228,7 +239,12 @@ try {{
                 f.write(ps_code)
 
             messagebox.showinfo("Pembaruan Diunduh", "Pembaruan berhasil diunduh! Aplikasi akan meminta izin Administrator untuk memasang file.")
-            
+
+            # Clear PyInstaller environment variables before spawning PowerShell
+            for key in list(os.environ.keys()):
+                if key.startswith("_MEIPASS") or key.startswith("_PYI_"):
+                    os.environ.pop(key, None)
+
             # Mengeksekusi PowerShell dengan hak akses Administrator via ctypes API (UAC Trigger)
             import ctypes
             ctypes.windll.shell32.ShellExecuteW(None, "runas", "powershell.exe", f'-ExecutionPolicy Bypass -WindowStyle Hidden -File "{ps_script_path}"', "", 0)
