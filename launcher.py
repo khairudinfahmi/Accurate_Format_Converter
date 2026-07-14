@@ -27,7 +27,6 @@ def resource_path(relative_path):
 
 def get_local_version():
     try:
-        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
         # Mendapatkan path versi lokal dari direktori eksekusi aplikasi
         exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         v_path = os.path.join(exe_dir, "version.txt")
