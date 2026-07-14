@@ -202,8 +202,8 @@ try {{
                 import ctypes
                 ctypes.windll.shell32.ShellExecuteW(
                     None, "runas", "powershell.exe", 
-                    f'-ExecutionPolicy Bypass -WindowStyle Normal -File "{ps_script_path}"', 
-                    "", 1
+                    f'-ExecutionPolicy Bypass -WindowStyle Hidden -File "{ps_script_path}"', 
+                    "", 0
                 )
                 self.root.after(0, self.root.destroy)
                 return
@@ -268,7 +268,7 @@ try {{
             
             # Mengeksekusi PowerShell dengan hak akses Administrator via ctypes API (UAC Trigger)
             import ctypes
-            ctypes.windll.shell32.ShellExecuteW(None, "runas", "powershell.exe", f'-ExecutionPolicy Bypass -WindowStyle Normal -File "{ps_script_path}"', "", 1)
+            ctypes.windll.shell32.ShellExecuteW(None, "runas", "powershell.exe", f'-ExecutionPolicy Bypass -WindowStyle Hidden -File "{ps_script_path}"', "", 0)
             
             self.root.after(0, self.root.destroy) # Menutup instans launcher saat ini untuk menghindari konflik
 
