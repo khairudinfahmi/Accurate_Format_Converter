@@ -30,9 +30,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "dist\Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist\Accurate_Format_Converter.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist\version.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\Accurate_Format_Converter\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "assets\khairudinfahmi_cert.cer"; DestDir: "{app}\assets"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
@@ -43,3 +41,5 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{sys}\certutil.exe"; Parameters: "-addstore -f ""Root"" ""{app}\assets\khairudinfahmi_cert.cer"""; Flags: runhidden; StatusMsg: "Installing Security Certificate..."
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall runasoriginaluser
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait runasoriginaluser; Check: WizardSilent
+
