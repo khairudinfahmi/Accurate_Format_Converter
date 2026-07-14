@@ -1,5 +1,5 @@
 {
-  "latest_version": "4.2.0",
-  "download_url": "https://www.dropbox.com/scl/fi/kxx51lc81nrrzhw6zgn7s/Accurate_Converter_Setup_v4.1.exe?rlkey=n5em1ai9fzjkvnxl48ptcc71g&st=gjoqy7ml&dl=1&ext=.exe",
-  "release_notes": "Uji Coba Pembaruan Senyap (Silent Update) murni tanpa PowerShell.\n- Jika Anda melihat jendela PowerShell, Anda menggunakan Launcher lama.\n- Jika ini benar-benar senyap (hanya prompt Yes/No UAC admin), maka Launcher baru telah bekerja sempurna!"
+  "latest_version": "4.1.0",
+  "download_url": "https://www.dropbox.com/scl/fi/kxx51lc81nrrzhw6zgn7s/Accurate_Converter_Setup_v4.1.exe?rlkey=n5em1ai9fzjkvnxl48ptcc71g&st=4sdx1wf5&dl=1&ext=.exe",
+  "release_notes": "Pembaruan v4.1.0:\n- Menambahkan opsi KlikBCA (CSV) asli.\n- Hasil konversi BCA kini otomatis rapi masuk ke satu folder khusus.\n- Mengubah istilah 'XLS Backup' menjadi 'XLS Excel Formatter'.\n- Peralihan ke arsitektur Shared Directory (onedir) untuk peluncuran instan dan bebas error DLL.\n- Perbaikan mekanisme restart senyap pasca pembaruan otomatis.\n- Peningkatan keamanan sertifikat tanda tangan digital (anti-kebocoran PFX)."
 }
