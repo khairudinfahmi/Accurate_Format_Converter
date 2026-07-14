@@ -7,16 +7,15 @@
 ---
 
 ## 1. STRUKTUR DAN ARSITEKTUR PROYEK
-Aplikasi ini memiliki arsitektur 2-lapis (2-Tier):
-1. **Launcher (`launcher.py`)**: Aplikasi kecil (Tkinter) yang bertugas mengecek update dari GitHub Gist. Jika ada update, ia akan mendownload installer senyap, menggunakan skrip PowerShell (`install_update.ps1`) untuk mematikan proses lama dan menimpa file di direktori berjalan menggunakan argumen `/DIR`, lalu memulai ulang launcher.
+Aplikasi ini memiliki arsitektur 2-lapis (2-Tier) dengan model distribusi **Shared Directory (`onedir`)**:
+1. **Launcher (`launcher.py`)**: Aplikasi kecil (Tkinter) yang bertugas mengecek update dari GitHub Gist. Jika ada update berupa file `.exe` installer, Launcher akan membersihkan *environment variables* PyInstaller (`_MEIPASS`/`_PYI_`) dan memicu eksekusi installer secara langsung via `ShellExecuteW` (`/VERYSILENT /NORESTART /DIR=...`) tanpa melibatkan PowerShell atau jendela terminal apa pun, lalu menutup dirinya sendiri.
 2. **Main App (`main.py` -> `ui/app_window.py`)**: Aplikasi konverter utama.
 
 ### Hierarki Direktori Penting:
 *   `src/processors/bca_processor.py`: Logika ekstraksi PDF/CSV BCA.
 *   `src/processors/panin_processor.py`: Logika ekstraksi PDF/XLS/CSV Panin.
 *   `src/utils/helpers.py`: Pembersihan string, format mata uang, toleransi tanggal.
-*   `accurate_format_converter.spec`: Aturan PyInstaller Aplikasi Utama.
-*   `launcher.spec`: Aturan PyInstaller Launcher.
+*   `accurate_format_converter.spec`: Aturan PyInstaller tunggal (*unified spec*) yang mengompilasi `Accurate_Format_Converter.exe` dan `Launcher.exe` ke dalam satu folder bersama (`dist/Accurate_Format_Converter` - model `onedir`).
 
 ---
 
@@ -64,13 +63,15 @@ Panin memori memiliki edge case dan toleransi yang harus diperhatikan:
 ## 5. ATURAN MUTLAK: PROSES BUILD & PACKAGING (`BUILD_GUIDE.md`)
 AI **DILARANG** mengubah cara build aplikasi. Ikuti aturan ini 100%:
 
-### A. Isu Ukuran Membengkak (The Bloat Issue)
-Aplikasi ini hanya membutuhkan dependensi ringan (Pandas, PDFPlumber, Tkinter). **Jangan pernah memanggil PyInstaller menggunakan Python Global.** 
+### A. Arsitektur Shared Directory (`onedir`) & Ukuran Build
+Aplikasi ini dibangun dengan model **`onedir` (`exclude_binaries=True`)** agar tidak ada lagi ekstraksi DLL/dependensi ke folder `Temp` Windows yang memicu pemblokiran Windows Defender atau memori penuh (`_MEI`).
 *   **Wajib mutlak** memanggil Python dari dalam VENV (`.\.venv\Scripts\python.exe -m PyInstaller ...`). Menjalankan script aktivasi (`Activate.ps1`) seringkali gagal karena sistem proteksi eksekusi PowerShell di Windows, sehingga PyInstaller tembus mengambil library global.
-*   Jika AI melihat ukuran file build 200MB+, itu artinya PyInstaller salah menarik library seperti `torch`, `scipy`, atau `opencv`. Ukuran wajar adalah **~68 MB**.
+*   Kedua executable (`Accurate_Format_Converter.exe` dan `Launcher.exe`) berbagi folder `_internal` yang sama di `dist/Accurate_Format_Converter`.
+*   **Ukuran Wajar:** Ukuran folder `dist/Accurate_Format_Converter` mentah adalah **~118 MB**, sedangkan ukuran file Installer terkompresi (`Output/Accurate_Converter_Setup_v4.1.exe`) dari Inno Setup adalah **~42 MB**.
 
-### B. Patch Kritis PyInstaller (Mypyc `charset_normalizer`)
-Dalam file `accurate_format_converter.spec`, ada patch dinamis yang SANGAT KRITIS. Library `charset_normalizer` menggunakan ekstensi C `mypyc` yang memiliki hash acak (contoh: `81d243bd2c585b0f4821__mypyc.pyd`). PyInstaller tidak bisa melihatnya.
+### B. Patch Kritis PyInstaller (Mypyc `charset_normalizer` & Keamanan PFX)
+Dalam file `accurate_format_converter.spec`, ada dua aturan yang SANGAT KRITIS:
+1. **Patch `charset_normalizer`:** Library `charset_normalizer` menggunakan ekstensi C `mypyc` yang memiliki hash acak (contoh: `81d243bd2c585b0f4821__mypyc.pyd`). PyInstaller tidak bisa melihatnya.
 **Jangan pernah menghapus blok kode ini di `.spec`:**
 ```python
 import charset_normalizer
@@ -80,10 +81,11 @@ for f in glob.glob(os.path.join(site_packages, '*__mypyc*.pyd')):
     binaries.append((f, '.'))
 ```
 Tanpa kode ini, aplikasi akan *crash* `ModuleNotFoundError` di komputer user.
+2. **Filter Keamanan Aset PFX:** Pastikan pembungkus aset di `.spec` **hanya** memasukkan gambar dan ikon (`assets/*.png`, `assets/*.ico`) serta **TIDAK BOLEH** membundel file kunci privat `khairudinfahmi.pfx` ke dalam direktori distribusi.
 
 ### Deployment / Build
 - **Wajib menggunakan script `build_all.ps1`**. JANGAN PERNAH menyuruh pengguna menjalankan PyInstaller, signtool, atau Inno Setup compiler (ISCC) secara manual. Script sakti ini sudah meng-handle semuanya secara otomatis.
-- File installer selalu dihasilkan di folder `Output/`.
+- File installer selalu dihasilkan di folder `Output/` dan membundel seluruh isi direktori `dist/Accurate_Format_Converter/*`.
 
 ### Aturan Keamanan (Digital Signature)
 Gunakan sertifikat *Self-Signed* `assets\khairudinfahmi.pfx` dengan password `rensa2026`. File utama dan file Installer (`Output\Accurate_Converter_Setup_v4.1.exe` dari Inno Setup) **HARUS** di-sign.

@@ -21,10 +21,10 @@ Jalankan skrip PowerShell sakti ini dari *root* direktori:
 ```
 
 **Apa yang dilakukan skrip tersebut?**
-- Memanggil `PyInstaller` melalui *virtual environment* (`.venv`) agar ukuran `.exe` tetap ramping.
-- Mengompilasi `Accurate_Format_Converter.exe` dan `Launcher.exe`.
-- Menandatangani kedua *executable* tersebut menggunakan sertifikat digital (`assets\khairudinfahmi.pfx`) via PowerShell `Set-AuthenticodeSignature`.
-- Mengeksekusi Inno Setup Compiler (`ISCC.exe`) untuk merakit *Installer*.
+- Memanggil `PyInstaller` melalui *virtual environment* (`.venv`) menggunakan file konfigurasi tunggal (*unified spec*) `accurate_format_converter.spec` dengan model distribusi **Shared Directory (`onedir`)**.
+- Mengompilasi `Accurate_Format_Converter.exe` dan `Launcher.exe` yang berbagi folder DLL/dependensi (`_internal`) di `dist\Accurate_Format_Converter`.
+- Menandatangani kedua *executable* utama tersebut menggunakan sertifikat digital (`assets\khairudinfahmi.pfx`) via PowerShell `Set-AuthenticodeSignature`.
+- Mengeksekusi Inno Setup Compiler (`ISCC.exe`) untuk merakit *Installer* kompresi tinggi (`LZMA2/Ultra64`) yang membundel seluruh folder `dist\Accurate_Format_Converter`.
 - Menandatangani hasil akhir *Installer* di folder `Output\`.
 
 ---

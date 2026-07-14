@@ -32,9 +32,8 @@ Accurate_Format_Converter/
 |-- launcher.py                      # Auto-updater launcher
 |-- version.txt                      # Versi aplikasi (misal: 4.1.0)
 |-- update_info.json                 # Referensi lokal info update
-|-- accurate_format_converter.spec   # PyInstaller spec (App utama)
-|-- launcher.spec                    # PyInstaller spec (Launcher)
-|-- accurate_converter_installer.iss # Inno Setup script
+|-- accurate_format_converter.spec   # PyInstaller unified spec (App utama & Launcher, onedir mode)
+|-- accurate_converter_installer.iss # Inno Setup script (membundel dist\Accurate_Format_Converter)
 |-- build_all.ps1                    # Skrip build otomatis (PyInstaller + InnoSetup + Digital Sign)
 |-- BUILD_GUIDE.md                   # Panduan build & rilis
 |-- assets/
