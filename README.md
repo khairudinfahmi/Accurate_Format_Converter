@@ -9,12 +9,13 @@ Nggak perlu lagi ngedit-ngedit manual di Excel yang bikin pusing, aplikasi ini u
 ## Fiturnya Apa Aja?
 
 *   **Bisa banyak Bank:** 
-    *   **BCA:** Bisa baca mutasi dari file PDF. Logikanya udah diatur sedemikian rupa supaya bisa bedain mana uang masuk (CR) dan keluar (DB) dengan tepat.
+    *   **BCA:** Bisa membaca mutasi dari file **CSV (KlikBCA Asli)**. Logikanya udah diatur sedemikian rupa supaya bisa bedain mana uang masuk (CR) dan keluar (DB) dengan tepat. Output BCA juga super rapi karena otomatis **dibungkus ke dalam 1 folder** yang berisi 3 file (CSV Standar, Excel Formatter, dan KlikBCA CSV).
     *   **Panin:** Bisa baca dari PDF, XLS, maupun CSV. Udah ditangani juga misal ada kolom Excel yang agak geser.
-*   **Format Dijamin Pas:** Hasil jadinya (file XLS atau CSV) udah pas 5 kolom sesuai standar impor Accurate. Termasuk otomatis nambahin 7 baris *dummy* biar datanya nggak kepotong pas di-import.
+*   **Format Dijamin Pas:** Hasil jadinya (file XLS atau CSV) udah pas 5 kolom sesuai standar impor Accurate. Termasuk otomatis nambahin baris *dummy* biar datanya nggak kepotong pas di-import.
 *   **Aman dari Tanggal Error:** Kalau ada tanggal transaksi yang aneh atau nggak kebaca, barisnya bakal dipisah ke file tersendiri biar nggak ngerusak data utama.
 *   **Update Otomatis:** Kalau ada versi baru, aplikasi bakal otomatis download dan install sendiri di latar belakang tanpa ribet.
-*   **Ringan Banget:** Udah di-build pakai PyInstaller dengan rapi, sizenya cuma sekitar 68MB. Tinggal pakai aja.
+*   **Aman dari SmartScreen (Baru):** Installer secara otomatis akan menginjeksi Digital Certificate ke *Trusted Root* PC Anda sehingga terhindar dari pemblokiran Windows Defender SmartScreen.
+*   **Ringan Banget:** Udah di-build pakai PyInstaller dengan rapi, sizenya cuma sekitar 66MB. Tinggal pakai aja.
 
 ## Cara Pakai
 
@@ -27,6 +28,5 @@ Buat yang cuma mau pakai aplikasinya langsung:
 
 Kalau mau ikut ngembangin atau sekadar lihat-lihat kodenya, wajib banget baca dokumen-dokumen ini dulu biar nggak bingung:
 1. **[`FORMAT_SPEC.md`](./FORMAT_SPEC.md)**: Ini panduan utama soal gimana struktur kolomnya dibikin biar Accurate nggak nolak pas di-import.
-2. **[`BUILD_GUIDE.md`](./BUILD_GUIDE.md)**: Cara nge-build aplikasi ini jadi `.exe` yang ringan dan cara nambahin *Self-Signed Signature* (menggunakan file `.pfx`).
+2. **[`BUILD_GUIDE.md`](./BUILD_GUIDE.md)**: Cara nge-build aplikasi menggunakan skrip sakti `build_all.ps1` yang sudah mengotomatisasi PyInstaller, Inno Setup, dan penyematan *Digital Signature*.
 3. **[`AI.md`](./AI.md)**: Panduan arsitektur aplikasi buat referensi cepat.
-
