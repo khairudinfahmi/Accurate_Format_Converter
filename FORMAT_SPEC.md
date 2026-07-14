@@ -15,7 +15,7 @@ di bawah ini TANPA persetujuan eksplisit dari pemilik project (Fahmi).
 
 1. Arsitektur Project
 2. Spesifikasi Output PANIN (Format XLS)
-3. Spesifikasi Output BCA (Format CSV + XLS Backup)
+3. Spesifikasi Output BCA (Format CSV + XLS Excel Formatter + KlikBCA CSV)
 4. Logika Dummy Row
 5. Logika Currency & Date Parsing
 6. Styling XLS (Warna, Font, Format Angka)
@@ -30,7 +30,7 @@ di bawah ini TANPA persetujuan eksplisit dari pemilik project (Fahmi).
 Accurate_Format_Converter/
 |-- main.py                          # Entry point, load UI
 |-- launcher.py                      # Auto-updater launcher
-|-- version.txt                      # Versi aplikasi (misal: 4.0.0)
+|-- version.txt                      # Versi aplikasi (misal: 4.1.0)
 |-- update_info.json                 # Referensi lokal info update
 |-- accurate_format_converter.spec   # PyInstaller spec (App utama)
 |-- launcher.spec                    # PyInstaller spec (Launcher)
@@ -122,9 +122,10 @@ saldo sebelum transaksi pertama terjadi.
 
 ## 3. Spesifikasi Output BCA
 
-BCA menghasilkan 2 file output sekaligus:
+BCA menghasilkan 3 file output sekaligus:
 1. CSV (Primary) -- Untuk di-import ke Accurate Online
-2. XLS (Backup)  -- Untuk arsip data
+2. XLS (Excel Formatter) -- Alternatif template import Accurate Online (sama seperti format Panin)
+3. KlikBCA CSV   -- Format asli KlikBCA (100% presisi untuk import Accurate jika dibutuhkan)
 
 ### 3.1 Format CSV BCA (PRIMARY - Import Accurate)
 
@@ -239,7 +240,7 @@ Setelah semua transaksi diekstrak, dilakukan pengecekan ulang:
 - Jika saldo tidak cocok dengan keduanya (karena ada transaksi lain
   tanpa saldo di antaranya): pertahankan tipe dari Fase 1.
 
-### 3.3 Format XLS Backup BCA
+### 3.3 Format XLS Excel Formatter BCA
 
 Strukturnya SAMA dengan output Panin (lihat Bagian 2.2):
 - 7 baris DUMMY
@@ -249,9 +250,58 @@ Strukturnya SAMA dengan output Panin (lihat Bagian 2.2):
 - 1 baris Saldo Akhir
 
 Perbedaan dengan Panin:
-- Tanggal BCA di XLS backup: dd/mm/yyyy (ditambahkan /tahun otomatis)
+- Tanggal BCA di XLS formatter: dd/mm/yyyy (ditambahkan /tahun otomatis)
   Karena PDF BCA hanya menyediakan dd/mm, tahun diambil dari tahun saat ini.
 - Kolom debet/kredit dipisah (sama seperti Panin)
+
+### 3.4 Format CSV KlikBCA (Format 3 - Hasil Konversi Baru)
+
+Format ini adalah replika 100% dari CSV ekspor KlikBCA Business.
+Sangat sensitif terhadap spasi, tanda kutip, dan koma.
+
+#### Aturan Quoting & Line Ending:
+- Line terminator: \n (LF only, BUKAN \r\n).
+- Quoting: `csv.QUOTE_ALL` (semua field dikutip ganda), KECUALI baris 1.
+
+#### Header Spesial (Baris 1 & 2):
+```csv
+"Informasi Rekening - Mutasi Rekening"," "," "," "," ",
+(baris kosong)
+```
+PENTING: Baris 1 memiliki trailing comma `,` lalu newline, artinya field ke-6 kosong TANPA tanda kutip. Harus di-write manual.
+
+#### Metadata Single-Cell (Baris 3-6):
+```csv
+"No. rekening : 1234567890"
+"Nama : NAMA NASABAH"
+"Periode : 05/12/2026 - 15/12/2026"
+"Kode Mata Uang : Rp"
+```
+
+#### Header Tabel (Baris 7):
+```csv
+"Tanggal Transaksi","Keterangan","Cabang","Jumlah","Saldo"
+```
+
+#### Data Transaksi (Baris 8+):
+```csv
+"05/12/2026","SETORAN TUNAI","0000","1,500,000.00 CR","25,000,000.00"
+```
+- Tanggal Transaksi: "DD/MM/YYYY"
+- Keterangan: Deskripsi transaksi
+- Cabang: "0000" (atau cabang asli jika input dari CSV)
+- Jumlah: "1,500,000.00 CR" (Koma separator ribuan + spasi + CR/DB)
+- Saldo: "25,000,000.00" (Koma separator ribuan)
+
+#### Footer Ringkasan:
+```csv
+"Saldo Awal : 23,500,000.00"
+"Mutasi Debet : 0.00","0"
+"Mutasi Kredit : 1,500,000.00","1"
+"Saldo Akhir : 25,000,000.00"
+(2 baris kosong)
+```
+PENTING: Terdapat kolom frekuensi transaksi di sebelah nilai Mutasi Debet/Kredit ("0" dan "1").
 
 
 ---
@@ -386,7 +436,7 @@ dengan template import Accurate Online.
 |-------------------------------|------------------------------------------------|
 | src/processors/panin_processor.py | OUTPUT_COLUMNS, urutan concat df_output, rumus saldo awal, format tanggal dd/mm/yyyy, logika debet/kredit kosong |
 | src/processors/bca_processor.py   | Format tanggal 'dd/mm, tipe CR/DB detection, cabang '0000, logika koreksi saldo |
-| src/ui/app_window.py              | CSV writer BCA (header metadata, line terminator \n, format angka f:.2f, kolom kosong antara Jumlah dan Saldo), XLS backup structure |
+| src/ui/app_window.py              | CSV writer BCA (header metadata, line terminator \n, format angka f:.2f, kolom kosong antara Jumlah dan Saldo), XLS formatter structure |
 | src/utils/file_exporter.py        | Styling XLS (dummy merah/italic, separator kuning, format angka #,##0.00), sheet name "Sheet1" |
 | src/utils/helpers.py              | clean_currency (logika koma/titik), parse_date_tolerant (urutan format) |
 
@@ -395,8 +445,8 @@ dengan template import Accurate Online.
 
 ## Catatan Akhir
 
-Dokumen ini dibuat berdasarkan kode versi 4.0.0 yang sudah 100% terverifikasi dan cocok
-dengan template import Accurate Online per tanggal 12 Juni 2026.
+Dokumen ini dibuat berdasarkan kode versi 4.1.0 yang sudah 100% terverifikasi dan cocok
+dengan template import Accurate Online per tanggal 14 Juni 2026.
 
 Jika ada AI atau developer lain yang diminta mengubah kode, WAJIB baca
 dokumen ini terlebih dahulu dan JANGAN mengubah format output tanpa

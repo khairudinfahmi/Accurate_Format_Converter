@@ -5,8 +5,111 @@ import datetime
 import pdfplumber
 from utils.helpers import clean_currency
 
+def _process_bca_csv(filepath, log_callback, progress_callback, success_callback, error_callback):
+    try:
+        log_callback("-" * 45)
+        log_callback("Memulai proses konversi BCA (dari CSV)...")
+        log_callback("-" * 45)
+        progress_callback(0.1)
+        
+        with open(filepath, 'r', encoding='utf-8-sig') as f:
+            reader = csv.reader(f)
+            lines = list(reader)
+        
+        rekening = "1234567890"
+        nama = "NASABAH BCA"
+        saldo_awal = 0.0
+        saldo_akhir = 0.0
+        periode_raw = ""
+        transactions = []
+        
+        data_started = False
+        
+        for i, row in enumerate(lines):
+            if not row:
+                continue
+            
+            line_str = "".join(row)
+            
+            if "No. rekening :" in line_str:
+                match = re.search(r'No\.\s*rekening\s*:\s*(\d+)', line_str, re.IGNORECASE)
+                if match: rekening = match.group(1)
+            elif "Nama :" in line_str:
+                match = re.search(r'Nama\s*:\s*(.*)', line_str, re.IGNORECASE)
+                if match: nama = match.group(1).strip()
+            elif "Periode :" in line_str:
+                match = re.search(r'Periode\s*:\s*(.*)', line_str, re.IGNORECASE)
+                if match: periode_raw = match.group(1).strip()
+            elif "Saldo Awal :" in line_str:
+                match = re.search(r'Saldo Awal\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
+                if match: saldo_awal = clean_currency(match.group(1))
+            elif "Saldo Akhir :" in line_str:
+                match = re.search(r'Saldo Akhir\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
+                if match: saldo_akhir = clean_currency(match.group(1))
+            
+            if len(row) >= 5 and "Tanggal Transaksi" in row[0] and "Keterangan" in row[1]:
+                data_started = True
+                continue
+                
+            if data_started:
+                if len(row) >= 5 and re.match(r'\d{2}/\d{2}', row[0]):
+                    tgl_match = re.search(r'(\d{2}/\d{2})', row[0])
+                    tgl_clean = tgl_match.group(1) if tgl_match else row[0]
+                    
+                    desc = row[1]  # Preserve trailing spaces (jangan strip)
+                    cabang = row[2].strip()
+                    
+                    jumlah_str = row[3].strip()
+                    mutasi = 0.0
+                    tipe = "CR"
+                    if " CR" in jumlah_str.upper():
+                        tipe = "CR"
+                        mutasi = clean_currency(jumlah_str.upper().replace(" CR", ""))
+                    elif " DB" in jumlah_str.upper():
+                        tipe = "DB"
+                        mutasi = clean_currency(jumlah_str.upper().replace(" DB", ""))
+                    else:
+                        mutasi = clean_currency(jumlah_str)
+                    
+                    saldo = clean_currency(row[4])
+                    
+                    transactions.append({
+                        "tanggal": "'" + tgl_clean,
+                        "keterangan": desc,
+                        "cabang": "'" + cabang,
+                        "mutasi": mutasi,
+                        "tipe": tipe,
+                        "saldo_printed": saldo,
+                        "saldo": saldo
+                    })
+                    
+        progress_callback(0.9)
+        
+        valid_count = len(transactions)
+        log_callback("-" * 45)
+        log_callback(f"Total Transaksi Valid: {valid_count}")
+        log_callback(f"Saldo Awal: {saldo_awal:,.2f}")
+        log_callback(f"Saldo Akhir: {saldo_akhir:,.2f}")
+        log_callback("-" * 45)
+        
+        if valid_count == 0:
+            raise Exception("File CSV berhasil dibaca, namun tidak ditemukan data transaksi BCA.")
+        
+        # Simpan metadata periode di transaksi pertama (untuk Format 3 generator)
+        if periode_raw and transactions:
+            transactions[0]["_periode_raw"] = periode_raw
+            
+        success_callback(transactions, rekening, nama, saldo_awal, saldo_akhir, filepath)
+        
+    except Exception as e:
+        error_callback(str(e))
+
 def process_bca(filepath, log_callback, progress_callback, success_callback, error_callback):
     try:
+        if filepath.lower().endswith('.csv'):
+            _process_bca_csv(filepath, log_callback, progress_callback, success_callback, error_callback)
+            return
+
         log_callback("-" * 45)
         log_callback("Memulai proses konversi BCA...")
         log_callback("-" * 45)

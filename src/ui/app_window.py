@@ -18,12 +18,12 @@ from processors.bca_processor import process_bca
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        self.root.title("Accurate Format Converter v4.0.0") 
+        self.root.title("Accurate Format Converter v4.1.0") 
         
         self.icon_path = resource_path("assets/rensa_logo.ico")
 
         try:
-            myappid = 'accurate.format.converter.v1.0' 
+            myappid = 'accurate.format.converter.app' 
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
         except Exception:
             pass
@@ -203,7 +203,7 @@ class UniversalAccurateConverter:
 
         self.path_var = tk.StringVar()
         self.entry_path = ctk.CTkEntry(file_frame, textvariable=self.path_var, width=600, height=45,
-                                       placeholder_text="Pilih file mutasi (Panin: .xls/.xlsx/.csv/.pdf | BCA: .pdf)...", 
+                                       placeholder_text="Pilih file mutasi (Panin: .xls/.xlsx/.csv/.pdf | BCA: .pdf/.csv)...", 
                                        font=ctk.CTkFont(family="Inter", size=13),
                                        border_color=("#E5E9F2", "#4A5568"), border_width=2,
                                        fg_color=("#F9FAFB", "#2D3748"), corner_radius=10)
@@ -360,8 +360,8 @@ class UniversalAccurateConverter:
                 error_callback=handle_error
             )
         elif bank == "BCA":
-            if not filepath.lower().endswith('.pdf'):
-                handle_error("Format file tidak valid. Mutasi BCA harus dalam format PDF.")
+            if not (filepath.lower().endswith('.pdf') or filepath.lower().endswith('.csv')):
+                handle_error("Format file tidak valid. Mutasi BCA harus dalam format PDF atau CSV.")
                 return
             process_bca(
                 filepath=filepath,
@@ -389,7 +389,7 @@ class UniversalAccurateConverter:
 
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:panin[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
-            default_name = f"ACCURATE_panin_{base_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xls"
+            default_name = f"{base_name} (Import Excel Formatter).xls"
             save_path = filedialog.asksaveasfilename(
                 defaultextension=".xls", 
                 filetypes=[("Excel 97-2003", "*.xls")], 
@@ -428,19 +428,32 @@ class UniversalAccurateConverter:
         try:
             messagebox.showinfo(
                 "Ekstraksi BCA Berhasil", 
-                f"Ekstraksi {len(transactions)} transaksi BCA berhasil!\n\nSistem akan menyimpan dua file sekaligus:\n1. Format CSV (Untuk diimpor ke Accurate)\n2. Format XLS (Sebagai backup data)\n\nSilakan tentukan lokasi penyimpanan."
+                f"Ekstraksi {len(transactions)} transaksi BCA berhasil!\n\nSistem akan menyimpan TIGA file (CSV Standar, Excel Formatter, KlikBCA) ke dalam SATU FOLDER khusus agar rapi.\n\nSilakan tentukan nama folder penyimpanan."
             )
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:bca[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
-            default_name = f"ACCURATE_bca_{base_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.csv"
-            save_path = filedialog.asksaveasfilename(
-                defaultextension=".csv", 
-                filetypes=[("CSV Document", "*.csv")], 
-                title="Simpan Format Accurate BCA",
+            default_name = f"BCA_{base_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}"
+            
+            save_path_raw = filedialog.asksaveasfilename(
+                defaultextension="", 
+                filetypes=[("Folder Penyimpanan", "*.*")], 
+                title="Simpan Format Accurate BCA (Akan dibuatkan Folder)",
                 initialfile=default_name
             )
             
-            if save_path:
+            if save_path_raw:
+                parent_dir = os.path.dirname(save_path_raw)
+                chosen_basename = os.path.splitext(os.path.basename(save_path_raw))[0]
+                
+                # Buat folder khusus
+                folder_name = f"Hasil Konversi BCA - {chosen_basename}"
+                target_dir = os.path.join(parent_dir, folder_name)
+                os.makedirs(target_dir, exist_ok=True)
+                
+                # Definisikan 3 path file baru
+                save_path = os.path.join(target_dir, f"{chosen_basename} (1 - Import CSV Standar).csv")
+                backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Import Excel Formatter).xls")
+                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (3 - Import KlikBCA Asli).csv")
                 # === PRIMARY: Save CSV (for Accurate import) ===
                 with open(save_path, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f, lineterminator='\n')
@@ -508,14 +521,80 @@ class UniversalAccurateConverter:
                 
                 df_output = pd.concat([df_dummy, row_saldo_awal, df_final, row_total_mutasi, row_saldo_akhir], ignore_index=True)
 
-                backup_name = f"backup_data_{os.path.splitext(os.path.basename(save_path))[0]}.xls"
-                backup_path = os.path.join(os.path.dirname(save_path), backup_name)
+                # backup_path sudah didefinisikan di atas (sebagai Excel Formatter)
                 save_exact_xls(df_output, backup_path, num_dummy, columns=cols)
+                
+                # === FORMAT 3: KlikBCA CSV ===
+                # klikbca_path sudah didefinisikan di atas
+                
+                with open(klikbca_path, 'w', newline='', encoding='utf-8') as f:
+                    # Baris 1: Header judul (MANUAL write karena field ke-6 kosong tanpa kutip)
+                    f.write('"Informasi Rekening - Mutasi Rekening"," "," "," "," ",\n')
                     
+                    # Baris 2: Baris kosong
+                    f.write('\n')
+                    
+                    # Baris 3-6: Metadata (single-cell strings)
+                    writer3 = csv.writer(f, lineterminator='\n', quoting=csv.QUOTE_ALL)
+                    
+                    # Hitung periode: gunakan metadata asli dari CSV jika tersedia
+                    periode_from_meta = transactions[0].get("_periode_raw", "") if transactions else ""
+                    year = str(datetime.datetime.now().year)
+                    
+                    if periode_from_meta:
+                        # Dari CSV input: gunakan periode asli
+                        periode_str = periode_from_meta
+                    else:
+                        # Dari PDF input: hitung dari tanggal transaksi
+                        dates = []
+                        for tx in transactions:
+                            raw = tx["tanggal"].replace("'", "")  # "'05/12" -> "05/12"
+                            dates.append(raw)
+                        if dates:
+                            full_dates = [d + "/" + year for d in dates]
+                            tgl_awal = full_dates[0]
+                            tgl_akhir = full_dates[-1]
+                        else:
+                            tgl_awal = f"01/01/{year}"
+                            tgl_akhir = f"31/12/{year}"
+                        periode_str = f"{tgl_awal} - {tgl_akhir}"
+                    
+                    writer3.writerow([f"No. rekening : {rekening}"])
+                    writer3.writerow([f"Nama : {safe_nama}"])
+                    writer3.writerow([f"Periode : {periode_str}"])
+                    writer3.writerow(["Kode Mata Uang : Rp"])
+                    
+                    # Baris 7: Header tabel
+                    writer3.writerow(["Tanggal Transaksi", "Keterangan", "Cabang", "Jumlah", "Saldo"])
+                    
+                    # Baris 8+: Data transaksi
+                    count_cr = 0
+                    count_db = 0
+                    for tx in transactions:
+                        tgl_clean = tx["tanggal"].replace("'", "") + "/" + year
+                        cabang_clean = tx["cabang"].replace("'", "")
+                        jumlah_str = f"{tx['mutasi']:,.2f} {tx['tipe']}"
+                        saldo_str = f"{tx['saldo']:,.2f}"
+                        
+                        if tx["tipe"] == "CR":
+                            count_cr += 1
+                        else:
+                            count_db += 1
+                        
+                        writer3.writerow([tgl_clean, tx["keterangan"], cabang_clean, jumlah_str, saldo_str])
+                    
+                    # Footer
+                    writer3.writerow([f"Saldo Awal : {saldo_awal:,.2f}"])
+                    writer3.writerow([f"Mutasi Debet : {total_debet:,.2f}", str(count_db)])
+                    writer3.writerow([f"Mutasi Kredit : {total_kredit:,.2f}", str(count_cr)])
+                    writer3.writerow([f"Saldo Akhir : {saldo_akhir:,.2f}"])
+                    f.write('\n')  # 1 baris kosong penutup (writerow sudah menambahkan \n)
+
                 self.update_progress(1.0)
                 self.log(f"[OK] BCA CSV Saved: {os.path.basename(save_path)}")
-                self.log(f"[OK] BCA Backup XLS Saved: {os.path.basename(backup_path)}")
-                self.show_copyable_dialog("Selesai BCA", f"File BCA CSV & Backup XLS berhasil disimpan!\n\nLokasi Utama (.csv):\n{save_path}\n\nBackup Data (.xls):\n{backup_path}\n\nTotal Data: {len(transactions)} baris", path_to_copy=save_path)
+                self.log(f"[OK] BCA Excel Formatter Saved: {os.path.basename(backup_path)}")
+                self.log(f"[OK] BCA KlikBCA CSV Saved: {os.path.basename(klikbca_path)}")
+                self.show_copyable_dialog("Selesai BCA", f"Tiga File BCA berhasil disimpan dalam folder:\n{target_dir}\n\n1. Import CSV Standar\n2. Import Excel Formatter\n3. Import KlikBCA Asli\n\nTotal Data: {len(transactions)} baris", path_to_copy=target_dir)
             else:
                 self.update_progress(0)
                 self.log("[INFO] Penyimpanan dibatalkan oleh user.")

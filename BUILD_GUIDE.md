@@ -51,21 +51,21 @@ Buka Inno Setup compiler melalui Command Line untuk membuat Installer yang siap 
 ```powershell
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" accurate_converter_installer.iss
 ```
-File hasil installer akan dibuat di dalam folder `Output\` dengan nama `Accurate_Converter_Setup_v4.0.exe` (atau sesuai versi).
+File hasil installer akan dibuat di dalam folder `Output\` dengan nama `Accurate_Converter_Setup_v4.1.exe` (atau sesuai versi).
 
 ---
 
 ## 6. Digital Signing Tahap 2 (Installer)
 File installer `.exe` juga HARUS ditandatangani secara digital agar saat user mengunduh tidak terkena peringatan keamanan.
 ```powershell
-& "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" sign /f "assets\khairudinfahmi.pfx" /p rensa2026 /fd SHA256 /t http://timestamp.digicert.com "Output\Accurate_Converter_Setup_v4.0.exe"
+& "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe" sign /f "assets\khairudinfahmi.pfx" /p rensa2026 /fd SHA256 /t http://timestamp.digicert.com "Output\Accurate_Converter_Setup_v4.1.exe"
 ```
 
 ---
 
 ## 7. Rilis dan Publikasi
-1. Upload file `Output\Accurate_Converter_Setup_v4.0.exe` ke halaman **GitHub Releases**.
+1. Upload file `Output\Accurate_Converter_Setup_v4.1.exe` ke halaman **GitHub Releases**.
 2. Masuk ke Gist GitHub dan perbaharui file `update_info.json`:
-   - Ganti `latest_version` dengan versi baru (misal: `"4.0.0"`).
+   - Ganti `latest_version` dengan versi baru (misal: `"4.1.0"`).
    - Ganti `download_url` dengan direct link (akhiran `.exe`) dari GitHub Releases yang baru di-upload.
 3. Begitu metadata ini disimpan, aplikasi pengguna lama akan secara otomatis mendeteksi update.

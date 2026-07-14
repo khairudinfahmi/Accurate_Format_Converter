@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Accurate Format Converter"
-#define MyAppVersion "4.0.0"
+#define MyAppVersion "4.1.0"
 #define MyAppPublisher "khairudinfahmi"
 #define MyAppExeName "Launcher.exe"
 
@@ -16,7 +16,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
-OutputBaseFilename=Accurate_Converter_Setup_v4.0
+OutputBaseFilename=Accurate_Converter_Setup_v4.1
 SetupIconFile=assets\rensa_logo.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma
@@ -32,6 +32,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "dist\Launcher.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\Accurate_Format_Converter.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\version.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "assets\khairudinfahmi_cert.cer"; DestDir: "{app}\assets"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
@@ -39,4 +40,5 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+Filename: "{sys}\certutil.exe"; Parameters: "-addstore -f ""Root"" ""{app}\assets\khairudinfahmi_cert.cer"""; Flags: runhidden; StatusMsg: "Installing Security Certificate..."
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

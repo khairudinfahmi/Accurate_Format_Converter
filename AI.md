@@ -12,7 +12,7 @@ Aplikasi ini memiliki arsitektur 2-lapis (2-Tier):
 2. **Main App (`main.py` -> `ui/app_window.py`)**: Aplikasi konverter utama.
 
 ### Hierarki Direktori Penting:
-*   `src/processors/bca_processor.py`: Logika ekstraksi PDF/XLS BCA.
+*   `src/processors/bca_processor.py`: Logika ekstraksi PDF/CSV BCA.
 *   `src/processors/panin_processor.py`: Logika ekstraksi PDF/XLS/CSV Panin.
 *   `src/utils/helpers.py`: Pembersihan string, format mata uang, toleransi tanggal.
 *   `accurate_format_converter.spec`: Aturan PyInstaller Aplikasi Utama.
@@ -35,7 +35,9 @@ Aplikasi ini ditujukan untuk mengimpor data ke **Accurate Online**. Format outpu
 ---
 
 ## 3. ATURAN MUTLAK: PARSING BCA (`bca_processor.py`)
-BCA memiliki format PDF yang paling kompleks. AI tidak boleh merusak sistem prioritas (3-Phase) berikut:
+BCA memiliki format PDF yang kompleks, serta mendukung input CSV (seperti ekspor KlikBCA). 
+PENTING: BCA menghasilkan **3 file output sekaligus** (CSV Accurate, XLS Formatter, dan KlikBCA CSV).
+Untuk input PDF, AI tidak boleh merusak sistem prioritas (3-Phase) berikut:
 
 1.  **Sistem Koordinat (X0):**
     *   `x0 < 85`: Kolom Tanggal.
@@ -80,7 +82,7 @@ for f in glob.glob(os.path.join(site_packages, '*__mypyc*.pyd')):
 Tanpa kode ini, aplikasi akan *crash* `ModuleNotFoundError` di komputer user.
 
 ### C. Digital Signing
-Gunakan sertifikat *Self-Signed* `assets\khairudinfahmi.pfx` dengan password `rensa2026`. File utama dan file Installer (`Output\Accurate_Converter_Setup_v4.0.exe` dari Inno Setup) **HARUS** di-sign.
+Gunakan sertifikat *Self-Signed* `assets\khairudinfahmi.pfx` dengan password `rensa2026`. File utama dan file Installer (`Output\Accurate_Converter_Setup_v4.1.exe` dari Inno Setup) **HARUS** di-sign.
 
 ---
 
