@@ -1,5 +1,5 @@
 {
   "latest_version": "4.1.0",
-  "download_url": "https://drive.google.com/uc?export=download&id=1are7tOoYIEK1cbTZi9lYWAnuCeqnlctG",
+  "download_url": "https://drive.google.com/uc?export=download&id=1are7tOoYIEK1cbTZi9lYWAnuCeqnlctG&ext=.exe",
   "release_notes": "Pembaruan v4.1.0:\n- Menambahkan opsi KlikBCA (CSV) asli.\n- Hasil konversi BCA kini otomatis rapi masuk ke satu folder khusus.\n- Mengubah istilah 'XLS Backup' menjadi 'XLS Excel Formatter'.\n- Peningkatan keamanan installer agar lolos dari blokir Windows SmartScreen."
 }
