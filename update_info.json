@@ -1,5 +1,5 @@
 {
   "latest_version": "4.1.0",
-  "download_url": "https://github.com/khairudinfahmi/Accurate_Format_Converter/releases/download/v4.1.0/Accurate_Converter_Setup_v4.1.exe",
-  "release_notes": "- Fitur Baru: Dukungan output CSV KlikBCA Asli\n- Perbaikan UX: 3 Output BCA kini otomatis dibungkus ke dalam 1 folder\n- Perbaikan Terminologi: Penggunaan istilah 'XLS Excel Formatter'\n- Peningkatan Keamanan: Installer kini otomatis menginjeksi Sertifikat Digital untuk lolos dari blokir Windows SmartScreen."
+  "download_url": "https://drive.google.com/uc?export=download&id=1are7tOoYIEK1cbTZi9lYWAnuCeqnlctG",
+  "release_notes": "Pembaruan v4.1.0:\n- Menambahkan opsi KlikBCA (CSV) asli.\n- Hasil konversi BCA kini otomatis rapi masuk ke satu folder khusus.\n- Mengubah istilah 'XLS Backup' menjadi 'XLS Excel Formatter'.\n- Peningkatan keamanan installer agar lolos dari blokir Windows SmartScreen."
 }
