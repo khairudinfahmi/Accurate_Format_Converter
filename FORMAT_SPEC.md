@@ -56,7 +56,7 @@ Accurate_Format_Converter/
 
 ---
 
-## 2. Spesifikasi Output PANIN (Format XLS)
+## 2. Spesifikasi Output PANIN (Format XLS - `XXXXX (Template Excel Formatter).xls`)
 
 ### 2.1 Kolom Output (Urutan Wajib)
 
@@ -122,12 +122,12 @@ saldo sebelum transaksi pertama terjadi.
 
 ## 3. Spesifikasi Output BCA
 
-BCA menghasilkan 3 file output sekaligus di dalam satu folder (`XXXXX (1 - Import Rekening Tahapan).csv`, `XXXXX (2 - Import Excel Formatter).xls`, & `XXXXX (3 - Import Rekening Giro).csv`):
-1. CSV Standar (`1 - Import Rekening Tahapan`) -- Untuk di-import ke Accurate Online (opsi Rekening Tahapan)
-2. XLS (`2 - Import Excel Formatter`) -- Alternatif template import Accurate Online (struktur sel terproteksi sama seperti format Panin)
-3. KlikBCA CSV (`3 - Import Rekening Giro`) -- Replika asli ekspor KlikBCA Business (untuk di-import ke Accurate Online opsi Rekening Giro)
+BCA menghasilkan 3 file output sekaligus di dalam satu folder (`XXXXX (1 - Template Rekening Tahapan).csv`, `XXXXX (2 - Template Excel Formatter).xls`, & `XXXXX (3 - Template Rekening Giro).csv`):
+1. CSV Standar (`1 - Template Rekening Tahapan`) -- Untuk di-import ke Accurate Online (opsi Rekening Tahapan)
+2. XLS (`2 - Template Excel Formatter`) -- Alternatif template import Accurate Online (struktur sel terproteksi sama seperti format Panin)
+3. KlikBCA CSV (`3 - Template Rekening Giro`) -- Replika asli ekspor KlikBCA Business (untuk di-import ke Accurate Online opsi Rekening Giro)
 
-### 3.1 Format CSV BCA (`1 - Import Rekening Tahapan`)
+### 3.1 Format CSV BCA (`1 - Template Rekening Tahapan`)
 
 #### Header Metadata (Baris 1-4):
 ```csv
@@ -254,7 +254,7 @@ Perbedaan dengan Panin:
   Karena PDF BCA hanya menyediakan dd/mm, tahun diambil dari tahun saat ini.
 - Kolom debet/kredit dipisah (sama seperti Panin)
 
-### 3.4 Format CSV KlikBCA (`3 - Import Rekening Giro`)
+### 3.4 Format CSV KlikBCA (`3 - Template Rekening Giro`)
 
 Format ini adalah replika 100% dari CSV ekspor KlikBCA Business.
 Sangat sensitif terhadap spasi, tanda kutip, dan koma.

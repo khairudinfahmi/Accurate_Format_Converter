@@ -400,7 +400,7 @@ class UniversalAccurateConverter:
 
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:panin[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
-            default_name = f"{base_name} (Import Excel Formatter).xls"
+            default_name = f"{base_name} (Template Excel Formatter).xls"
             save_path = filedialog.asksaveasfilename(
                 defaultextension=".xls", 
                 filetypes=[("Excel 97-2003", "*.xls")], 
@@ -462,9 +462,9 @@ class UniversalAccurateConverter:
                 os.makedirs(target_dir, exist_ok=True)
                 
                 # Definisikan 3 path file baru
-                save_path = os.path.join(target_dir, f"{chosen_basename} (1 - Import Rekening Tahapan).csv")
-                backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Import Excel Formatter).xls")
-                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (3 - Import Rekening Giro).csv")
+                save_path = os.path.join(target_dir, f"{chosen_basename} (1 - Template Rekening Tahapan).csv")
+                backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Template Excel Formatter).xls")
+                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (3 - Template Rekening Giro).csv")
                 # === PRIMARY: Save CSV (for Accurate import) ===
                 with open(save_path, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f, lineterminator='\n')
@@ -605,7 +605,7 @@ class UniversalAccurateConverter:
                 self.log(f"[OK] BCA CSV Saved: {os.path.basename(save_path)}")
                 self.log(f"[OK] BCA Excel Formatter Saved: {os.path.basename(backup_path)}")
                 self.log(f"[OK] BCA KlikBCA CSV Saved: {os.path.basename(klikbca_path)}")
-                self.show_copyable_dialog("Selesai BCA", f"Tiga File BCA berhasil disimpan dalam folder:\n{target_dir}\n\n1. Import Rekening Tahapan\n2. Import Excel Formatter\n3. Import Rekening Giro\n\nTotal Data: {len(transactions)} baris", path_to_copy=target_dir)
+                self.show_copyable_dialog("Selesai BCA", f"Tiga File BCA berhasil disimpan dalam folder:\n{target_dir}\n\n1. Template Rekening Tahapan\n2. Template Excel Formatter\n3. Template Rekening Giro\n\nTotal Data: {len(transactions)} baris", path_to_copy=target_dir)
             else:
                 self.update_progress(0)
                 self.log("[INFO] Penyimpanan dibatalkan oleh user.")
