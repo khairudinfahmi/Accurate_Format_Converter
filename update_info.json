@@ -1,5 +1,5 @@
 {
-  "latest_version": "4.2.0",
-  "download_url": "https://www.dropbox.com/scl/fi/4q206tyxg9m4y1auq0yml/Accurate_Converter_Setup_v4.2.exe?rlkey=7gey6x4zuhgjx7xvon8k725yk&st=hkfkirbi&dl=1&ext=.exe",
-  "release_notes": "Pembaruan v4.2.0:\n- Perbaikan bug kritis: penambahan bundle engine Excel (xlrd & openpyxl) pada spesifikasi PyInstaller untuk mendukung pembacaan mutasi Panin (.xls & .xlsx).\n- Peningkatan arsitektur launcher: penandatanganan digital installer yang dinamis & deteksi versi aplikasi otomatis dari version.txt.\n- Pembersihan linter dan optimalisasi import pada seluruh modul prosesor."
+  "latest_version": "4.3.0",
+  "download_url": "https://www.dropbox.com/scl/fi/4q206tyxg9m4y1auq0yml/Accurate_Converter_Setup_v4.3.exe?rlkey=7gey6x4zuhgjx7xvon8k725yk&st=hkfkirbi&dl=1&ext=.exe",
+  "release_notes": "Pembaruan v4.3.0:\n- Peningkatan versi ke 4.3.0 dengan standarisasi penamaan file output menjadi Template (pada Panin dan ketiga file BCA).\n- Perbaikan bug kritis dan optimalisasi arsitektur pembacaan mutasi."
 }

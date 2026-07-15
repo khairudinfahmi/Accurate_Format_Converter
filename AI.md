@@ -67,7 +67,7 @@ AI **DILARANG** mengubah cara build aplikasi. Ikuti aturan ini 100%:
 Aplikasi ini dibangun dengan model **`onedir` (`exclude_binaries=True`)** agar tidak ada lagi ekstraksi DLL/dependensi ke folder `Temp` Windows yang memicu pemblokiran Windows Defender atau memori penuh (`_MEI`).
 *   **Wajib mutlak** memanggil Python dari dalam VENV (`.\.venv\Scripts\python.exe -m PyInstaller ...`). Menjalankan script aktivasi (`Activate.ps1`) seringkali gagal karena sistem proteksi eksekusi PowerShell di Windows, sehingga PyInstaller tembus mengambil library global.
 *   Kedua executable (`Accurate_Format_Converter.exe` dan `Launcher.exe`) berbagi folder `_internal` yang sama di `dist/Accurate_Format_Converter`.
-*   **Ukuran Wajar:** Ukuran folder `dist/Accurate_Format_Converter` mentah adalah **~160 MB**, sedangkan ukuran file Installer terkompresi (`Output/Accurate_Converter_Setup_v4.2.exe`) dari Inno Setup adalah **~66 MB** (persisnya ~69 MB dengan `pandas`, `numpy`, `xlrd`, & `openpyxl` lengkap terbundel).
+*   **Ukuran Wajar:** Ukuran folder `dist/Accurate_Format_Converter` mentah adalah **~160 MB**, sedangkan ukuran file Installer terkompresi (`Output/Accurate_Converter_Setup_v4.3.exe`) dari Inno Setup adalah **~66 MB** (persisnya ~69 MB dengan `pandas`, `numpy`, `xlrd`, & `openpyxl` lengkap terbundel).
 
 ### B. Patch Kritis PyInstaller (Mypyc `charset_normalizer` & Keamanan PFX)
 Dalam file `accurate_format_converter.spec`, ada dua aturan yang SANGAT KRITIS:
@@ -88,7 +88,7 @@ Tanpa kode ini, aplikasi akan *crash* `ModuleNotFoundError` di komputer user.
 - File installer selalu dihasilkan di folder `Output/` dan membundel seluruh isi direktori `dist/Accurate_Format_Converter/*`.
 
 ### Aturan Keamanan (Digital Signature)
-Gunakan sertifikat *Self-Signed* `assets\khairudinfahmi.pfx` dengan password `rensa2026`. File utama dan file Installer (`Output\Accurate_Converter_Setup_v4.2.exe` dari Inno Setup) **HARUS** di-sign.
+Gunakan sertifikat *Self-Signed* `assets\khairudinfahmi.pfx` dengan password `rensa2026`. File utama dan file Installer (`Output\Accurate_Converter_Setup_v4.3.exe` dari Inno Setup) **HARUS** di-sign.
 
 ---
 

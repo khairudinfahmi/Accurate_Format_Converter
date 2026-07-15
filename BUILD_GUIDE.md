@@ -35,7 +35,7 @@ Setelah *Installer* berhasil dibuat di folder `Output\`, publikasikan rilis terb
 1. **Upload ke GitHub Releases:**
    Gunakan GitHub CLI untuk membuat rilis baru dan mengunggah *Installer*. Pastikan Anda tidak mengatur *tag* secara lokal, biarkan GitHub yang membuatkannya agar mendapat lencana **Verified**.
    ```powershell
-   gh release create v4.2.0 "Output\Accurate_Converter_Setup_v4.2.exe" --target main --title "Versi 4.2.0 (Fitur Baru)" --notes "Catatan Rilis..."
+   gh release create v4.3.0 "Output\Accurate_Converter_Setup_v4.3.exe" --target main --title "Versi 4.3.0 (Fitur Baru)" --notes "Catatan Rilis..."
    ```
 2. **Memicu Gist Manifest (Rahasia):**
    Ubah file `update_info.json` secara lokal dengan *version* dan tautan *download URL* `.exe` yang baru, lalu perbarui Gist Anda:
