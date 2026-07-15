@@ -1,5 +1,5 @@
 {
   "latest_version": "4.3.0",
-  "download_url": "https://www.dropbox.com/scl/fi/4q206tyxg9m4y1auq0yml/Accurate_Converter_Setup_v4.3.exe?rlkey=7gey6x4zuhgjx7xvon8k725yk&st=hkfkirbi&dl=1&ext=.exe",
+  "download_url": "https://www.dropbox.com/scl/fi/ktchwhihb9eazdw1ewhn5/Accurate_Converter_Setup_v4.3.exe?rlkey=1rb5eix9ajuynpk8pgizy46w2&st=aiy8ohwd&dl=1&ext=.exe",
   "release_notes": "Pembaruan v4.3.0:\n- Peningkatan versi ke 4.3.0 dengan standarisasi penamaan file output menjadi Template (pada Panin dan ketiga file BCA).\n- Perbaikan bug kritis dan optimalisasi arsitektur pembacaan mutasi."
 }
