@@ -439,7 +439,7 @@ class UniversalAccurateConverter:
         try:
             messagebox.showinfo(
                 "Ekstraksi BCA Berhasil", 
-                f"Ekstraksi {len(transactions)} transaksi BCA berhasil!\n\nSistem akan menyimpan TIGA file (CSV Standar, Excel Formatter, KlikBCA) ke dalam SATU FOLDER khusus agar rapi.\n\nSilakan tentukan nama folder penyimpanan."
+                f"Ekstraksi {len(transactions)} transaksi BCA berhasil!\n\nSistem akan menyimpan TIGA file (Rekening Tahapan, Excel Formatter, Rekening Giro) ke dalam SATU FOLDER khusus agar rapi.\n\nSilakan tentukan nama folder penyimpanan."
             )
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:bca[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
@@ -462,9 +462,9 @@ class UniversalAccurateConverter:
                 os.makedirs(target_dir, exist_ok=True)
                 
                 # Definisikan 3 path file baru
-                save_path = os.path.join(target_dir, f"{chosen_basename} (1 - Import CSV Standar).csv")
+                save_path = os.path.join(target_dir, f"{chosen_basename} (1 - Import Rekening Tahapan).csv")
                 backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Import Excel Formatter).xls")
-                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (3 - Import KlikBCA Asli).csv")
+                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (3 - Import Rekening Giro).csv")
                 # === PRIMARY: Save CSV (for Accurate import) ===
                 with open(save_path, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f, lineterminator='\n')
@@ -605,7 +605,7 @@ class UniversalAccurateConverter:
                 self.log(f"[OK] BCA CSV Saved: {os.path.basename(save_path)}")
                 self.log(f"[OK] BCA Excel Formatter Saved: {os.path.basename(backup_path)}")
                 self.log(f"[OK] BCA KlikBCA CSV Saved: {os.path.basename(klikbca_path)}")
-                self.show_copyable_dialog("Selesai BCA", f"Tiga File BCA berhasil disimpan dalam folder:\n{target_dir}\n\n1. Import CSV Standar\n2. Import Excel Formatter\n3. Import KlikBCA Asli\n\nTotal Data: {len(transactions)} baris", path_to_copy=target_dir)
+                self.show_copyable_dialog("Selesai BCA", f"Tiga File BCA berhasil disimpan dalam folder:\n{target_dir}\n\n1. Import Rekening Tahapan\n2. Import Excel Formatter\n3. Import Rekening Giro\n\nTotal Data: {len(transactions)} baris", path_to_copy=target_dir)
             else:
                 self.update_progress(0)
                 self.log("[INFO] Penyimpanan dibatalkan oleh user.")

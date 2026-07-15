@@ -9,7 +9,7 @@ Nggak perlu lagi ngedit-ngedit manual di Excel yang bikin pusing, aplikasi ini u
 ## Fiturnya Apa Aja?
 
 *   **Bisa banyak Bank:** 
-    *   **BCA:** Bisa membaca mutasi dari file **CSV (KlikBCA Asli)**. Logikanya udah diatur sedemikian rupa supaya bisa bedain mana uang masuk (CR) dan keluar (DB) dengan tepat. Output BCA juga super rapi karena otomatis **dibungkus ke dalam 1 folder** yang berisi 3 file (CSV Standar, Excel Formatter, dan KlikBCA CSV).
+    *   **BCA:** Bisa membaca mutasi dari file **CSV (KlikBCA Asli)**. Logikanya udah diatur sedemikian rupa supaya bisa bedain mana uang masuk (CR) dan keluar (DB) dengan tepat. Output BCA juga super rapi karena otomatis **dibungkus ke dalam 1 folder** yang berisi 3 file (`1 - Import Rekening Tahapan`, `2 - Import Excel Formatter`, dan `3 - Import Rekening Giro`).
     *   **Panin:** Bisa baca dari PDF, XLS, maupun CSV. Udah ditangani juga misal ada kolom Excel yang agak geser.
 *   **Format Dijamin Pas:** Hasil jadinya (file XLS atau CSV) udah pas 5 kolom sesuai standar impor Accurate. Termasuk otomatis nambahin baris *dummy* biar datanya nggak kepotong pas di-import.
 *   **Aman dari Tanggal Error:** Kalau ada tanggal transaksi yang aneh atau nggak kebaca, barisnya bakal dipisah ke file tersendiri biar nggak ngerusak data utama.
