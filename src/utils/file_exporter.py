@@ -1,7 +1,11 @@
-import os
 import xlwt
 import datetime
 import pandas as pd
+try:
+    import openpyxl  # pyright: ignore[reportUnusedImport]
+    _ = openpyxl
+except ImportError:
+    pass
 
 TARGET_SHEET_NAME = "Sheet1" 
 

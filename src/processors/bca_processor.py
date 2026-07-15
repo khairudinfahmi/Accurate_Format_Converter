@@ -1,7 +1,5 @@
-import os
 import re
 import csv
-import datetime
 import pdfplumber
 from utils.helpers import clean_currency
 

@@ -6,8 +6,8 @@ import os, glob
 # --- SECURITY FIX: Restrict assets to prevent PFX certificate leakage ---
 datas = [('assets/*.png', 'assets'), ('assets/*.ico', 'assets')]
 binaries = []
-hiddenimports = ['pdfplumber', 'fitz', 'PIL', 'PIL.Image', 'PIL._tkinter_finder']
-for pkg in ['PIL', 'charset_normalizer', 'pdfminer']:
+hiddenimports = ['pdfplumber', 'fitz', 'PIL', 'PIL.Image', 'PIL._tkinter_finder', 'xlrd', 'openpyxl', 'xlwt', 'customtkinter', 'pandas']
+for pkg in ['PIL', 'charset_normalizer', 'pdfminer', 'xlrd', 'openpyxl', 'xlwt', 'customtkinter', 'pandas']:
     tmp_ret = collect_all(pkg)
     datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 

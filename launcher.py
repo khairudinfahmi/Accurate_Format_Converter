@@ -27,10 +27,10 @@ def resource_path(relative_path):
 
 def get_local_version():
     try:
-        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-        # Mendapatkan path versi lokal dari direktori eksekusi aplikasi
         exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         v_path = os.path.join(exe_dir, "version.txt")
+        if not os.path.exists(v_path):
+            v_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version.txt")
         if os.path.exists(v_path):
             with open(v_path, "r") as f:
                 return f.read().strip()
@@ -128,10 +128,10 @@ class LauncherApp:
             self.update_ui("Mengunduh pembaruan... (Mohon tunggu)", 0)
             temp_dir = tempfile.gettempdir()
             
-            # Hapus whitespace tersembunyi pada URL
-            url = url.strip()
+            # Hapus whitespace tersembunyi dan auto-koreksi link Dropbox preview (dl=0 -> dl=1)
+            url = url.strip().replace("&dl=0", "&dl=1").replace("?dl=0", "?dl=1")
             
-            is_exe_installer = url.lower().endswith(".exe")
+            is_exe_installer = url.lower().split("?")[0].endswith(".exe") or url.lower().endswith(".exe")
             download_dest = os.path.join(temp_dir, "Update_Installer.exe" if is_exe_installer else "update_temp.zip")
             
             if os.path.exists(download_dest):

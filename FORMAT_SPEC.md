@@ -30,7 +30,7 @@ di bawah ini TANPA persetujuan eksplisit dari pemilik project (Fahmi).
 Accurate_Format_Converter/
 |-- main.py                          # Entry point, load UI
 |-- launcher.py                      # Auto-updater launcher
-|-- version.txt                      # Versi aplikasi (misal: 4.1.0)
+|-- version.txt                      # Versi aplikasi (misal: 4.2.0)
 |-- update_info.json                 # Referensi lokal info update
 |-- accurate_format_converter.spec   # PyInstaller unified spec (App utama & Launcher, onedir mode)
 |-- accurate_converter_installer.iss # Inno Setup script (membundel dist\Accurate_Format_Converter)
@@ -445,7 +445,7 @@ dengan template import Accurate Online.
 
 ## Catatan Akhir
 
-Dokumen ini dibuat berdasarkan kode versi 4.1.0 yang sudah 100% terverifikasi dan cocok
+Dokumen ini dibuat berdasarkan kode versi 4.2.0 yang sudah 100% terverifikasi dan cocok
 dengan template import Accurate Online per tanggal 14 Juni 2026.
 
 Jika ada AI atau developer lain yang diminta mengubah kode, WAJIB baca

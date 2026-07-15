@@ -1,5 +1,10 @@
-import os
 import pandas as pd
+try:
+    import xlrd  # pyright: ignore[reportUnusedImport]
+    import openpyxl  # pyright: ignore[reportUnusedImport]
+    _ = (xlrd, openpyxl)
+except ImportError:
+    pass
 from utils.helpers import clean_currency, clean_desc, parse_date_tolerant
 
 OUTPUT_COLUMNS = {

@@ -18,7 +18,18 @@ from processors.bca_processor import process_bca
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        self.root.title("Accurate Format Converter v4.1.0") 
+        version_str = "4.2.0"
+        try:
+            exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+            v_path = os.path.join(exe_dir, "version.txt")
+            if not os.path.exists(v_path):
+                v_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "version.txt")
+            if os.path.exists(v_path):
+                with open(v_path, "r") as f:
+                    version_str = f.read().strip()
+        except Exception:
+            pass
+        self.root.title(f"Accurate Format Converter v{version_str}") 
         
         self.icon_path = resource_path("assets/rensa_logo.ico")
 
