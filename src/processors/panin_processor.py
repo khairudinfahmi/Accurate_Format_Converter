@@ -40,6 +40,14 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
                 log_callback(f"CSV read err: {e}")
         elif file_ext.endswith('.pdf'):
             try:
+                from processors.panin_scan_processor import is_scanned_pdf, process_panin_scanned_pdf
+                if is_scanned_pdf(filepath):
+                    process_panin_scanned_pdf(filepath, log_callback, progress_callback, success_callback, error_callback)
+                    return
+            except Exception as scan_detect_err:
+                log_callback(f"[INFO] Scan check: {scan_detect_err}")
+
+            try:
                 import pdfplumber
                 import re
                 log_callback("Membaca PDF...")
