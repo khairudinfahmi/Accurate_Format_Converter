@@ -1,5 +1,5 @@
 {
   "latest_version": "4.4.0",
-  "download_url": "https://www.dropbox.com/scl/fi/ktchwhihb9eazdw1ewhn5/Accurate_Converter_Setup_v4.3.exe?rlkey=1rb5eix9ajuynpk8pgizy46w2&st=aiy8ohwd&dl=1&ext=.exe",
+  "download_url": "https://www.dropbox.com/scl/fi/afgqw9vrv352i1fwnzdhy/Accurate_Converter_Setup_v4.4.exe?rlkey=2cf30xroj2iaz8eyopaz2wv40&st=sav500rm&dl=1&ext=.exe",
   "release_notes": "Pembaruan v4.4.0:\n- Fitur baru: Konversi mutasi rekening koran Panin dari file PDF hasil scan fisik (printer dot-matrix) dengan verifikasi matematis 100% klop.\n- Mekanisme otomatis venv trampoline saat menjalankan aplikasi lewat terminal.\n- Peningkatan kestabilan runtime dan perbaikan modul dependensi."
 }
