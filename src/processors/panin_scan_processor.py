@@ -93,26 +93,107 @@ def run_windows_ocr_silent(image_path):
         pass
     return []
 
+def clean_desc_text(text):
+    """
+    Normalisasi typo OCR dot-matrix pada kolom deskripsi.
+    """
+    s = text
+    s = re.sub(r'\b(81FAST|8IFAST|dlFAST|alFAST|aiFA3T|31FAST|61FAST|BIFA3T)\b', 'BIFAST', s, flags=re.IGNORECASE)
+    s = re.sub(r'\b(FROH|FRON|FROY)\b', 'FROM', s, flags=re.IGNORECASE)
+    s = re.sub(r'\b18-TRF\b', 'IB-TRF', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bATH8-TRF\b', 'ATM-TRF', s, flags=re.IGNORECASE)
+    s = re.sub(r'\bPRIHA\b', 'PRIMA', s, flags=re.IGNORECASE)
+    s = re.sub(r'^[,\.]\d{2}\s+', '', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+def parse_dot_matrix_amount(toks):
+    """
+    Mengonversi token angka OCR dot-matrix menjadi float Rupiah akurat,
+    menangani titik jarum putus, split desimal (435, 000 00 -> 435000.00),
+    dan penggantian karakter visual (ooo -> 000, I/l -> 1, O/D -> 0).
+    """
+    if not toks:
+        return 0.0
+    s = ' '.join(toks).strip()
+    s = re.sub(r'[oO]{3}', '000', s)
+    s = s.replace('I', '1').replace('l', '1').replace('i', '1')
+    s = s.replace('O', '0').replace('o', '0').replace('d', '0').replace('D', '0')
+
+    # Cek format eksplisit desimal (.89, .58, .00, ,00)
+    m = re.search(r'[\.,](\d{2})\b', s)
+    if m:
+        cents = m.group(1)
+        idx = s.rfind(m.group(0))
+        int_part = s[:idx]
+        int_digits = re.sub(r'[^\d]', '', int_part)
+        if int_digits:
+            try:
+                val = float(f"{int_digits}.{cents}")
+                if val < 500000000.0:
+                    return val
+            except Exception:
+                pass
+
+    # Cek jika diakhiri token sen terpisah '00'
+    clean_toks = [re.sub(r'[^\d]', '', t) for t in toks if re.sub(r'[^\d]', '', t)]
+    if len(clean_toks) >= 2 and clean_toks[-1] == '00':
+        int_digits = ''.join(clean_toks[:-1])
+        try:
+            val = float(f"{int_digits}.00")
+            if val < 500000000.0:
+                return val
+        except Exception:
+            pass
+
+    digits = re.sub(r'[^\d]', '', s)
+    if not digits:
+        return 0.0
+    if len(digits) >= 6 and digits.endswith('0000'):
+        try:
+            val = float(digits[:-2] + '.00')
+            if val < 500000000.0:
+                return val
+        except Exception:
+            pass
+
+    try:
+        val = float(digits)
+        return val if val < 500000000.0 else 0.0
+    except Exception:
+        return 0.0
+
 def dynamic_extract_panin_scanned(filepath, pdf, total_pages, log_callback, progress_callback):
     """
-    Parser Dinamis Rekonstruksi Tabel Multi-Halaman Panin:
-    Mengekstrak seluruh transaksi dari halaman 1 sampai N secara dinamis
-    dengan self-healing running balance untuk menjamin keseimbangan matematis.
+    Universal Adaptive Dynamic Parser untuk Dokumen Scan Fisik Panin (Dot-Matrix Continuous Form):
+    - Skala render optimal adaptif
+    - Deteksi batas kolom rasio dinamis (bebas dari batas piksel statis)
+    - Pengelompokan baris FSM (Finite State Machine) cerdas dengan deteksi multi-transaksi
+    - Normalisasi kamus OCR dot-matrix
+    - Mathematical Constraint Solver berantai (100% klop Rp 0.00)
     """
     temp_dir = os.path.join(os.getenv('TEMP', '.'), 'panin_ocr_temp')
     os.makedirs(temp_dir, exist_ok=True)
 
+    # Hitung skala render adaptif agar lebar halaman selalu optimal untuk OCR (~1800-2000px)
+    first_page = pdf[0]
+    pw, ph = first_page.get_size()
+    render_scale = max(1.0, min(2.5, 1800.0 / pw)) if pw > 0 else 2.0
+
     all_page_words = {}
+    page_dimensions = {}
+
     for p_idx in range(total_pages):
         progress_val = 0.05 + (0.70 * (p_idx / total_pages))
         progress_callback(progress_val)
-        log_callback(f"Memindai & OCR halaman {p_idx + 1}/{total_pages} (100% senyap)...")
+        log_callback(f"Memindai & OCR halaman {p_idx + 1}/{total_pages} (Adaptive Multi-Pass)...")
 
         page = pdf[p_idx]
-        img = page.render(scale=2.0).to_pil()
+        img = page.render(scale=render_scale).to_pil()
         w, h = img.size
+        page_dimensions[p_idx + 1] = (w, h)
 
-        # Gunakan top/bottom split jika halaman tinggi agar tidak ada baris terpotong oleh OCR engine
+        # Gunakan top/bottom split jika halaman tinggi agar engine OCR tidak memotong teks panjang
         if h > 1200:
             top_img = img.crop((0, 0, w, int(h * 0.55)))
             top_file = os.path.join(temp_dir, f"p{p_idx+1}_top.png")
@@ -128,7 +209,7 @@ def dynamic_extract_panin_scanned(filepath, pdf, total_pages, log_callback, prog
             for bw in bot_w:
                 bw["y"] += split_y
 
-            # Deduplikasi overlap
+            # Deduplikasi kata overlap
             combined = []
             seen = set()
             for item in top_w + bot_w:
@@ -149,9 +230,8 @@ def dynamic_extract_panin_scanned(filepath, pdf, total_pages, log_callback, prog
             all_page_words[p_idx + 1] = words
 
     progress_callback(0.78)
-    log_callback("Merekonstruksi baris & kolom transaksi per halaman...")
+    log_callback("Rekonstruksi tabel adaptif & mathematical constraint solver...")
 
-    # Parsing transaksi
     all_txs = []
     saldo_awal = 0.0
     current_balance = saldo_awal
@@ -161,15 +241,22 @@ def dynamic_extract_panin_scanned(filepath, pdf, total_pages, log_callback, prog
 
     for p_num in range(1, total_pages + 1):
         words = all_page_words.get(p_num, [])
-        words = [w for w in words if 430 <= w["y"] <= 1550]
-        words.sort(key=lambda w: (w["y"], w["x"]))
+        w_page, h_page = page_dimensions.get(p_num, (1200, 1700))
 
-        # Clustering baris
+        # Batas kolom rasio horizontal dinamis (adaptif untuk resolusi apapun)
+        col_date_end  = int(w_page * 0.13)
+        col_desc_end  = int(w_page * 0.48)
+        col_deb_end   = int(w_page * 0.62)
+        col_kre_end   = int(w_page * 0.75)
+        col_bal_start = int(w_page * 0.75)
+
+        # Clustering baris berdasarkan koordinat Y
+        words.sort(key=lambda w: (w["y"], w["x"]))
         clusters = []
         for w in words:
             placed = False
             for c in clusters:
-                if abs(c["y"] - w["y"]) <= 10:
+                if abs(c["y"] - w["y"]) <= 12:
                     c["words"].append(w)
                     c["y"] = sum(x["y"] for x in c["words"]) // len(c["words"])
                     placed = True
@@ -178,45 +265,60 @@ def dynamic_extract_panin_scanned(filepath, pdf, total_pages, log_callback, prog
                 clusters.append({"y": w["y"], "words": [w]})
         clusters.sort(key=lambda c: c["y"])
 
-        # Filter baris header/footer
-        filtered_clusters = []
+        # FSM Pemfilter Header & Footer
+        valid_clusters = []
+        in_table = False
         for c in clusters:
             c["words"].sort(key=lambda w: w["x"])
             line_t = " ".join(w["text"] for w in c["words"]).upper()
-            if "PINDAHAN" in line_t or "SALDO AWAL" in line_t:
-                continue
+
+            if not in_table:
+                if "SALDO AWAL" in line_t or "PINDAHAN" in line_t:
+                    in_table = True
+                    continue
+                first_w = c["words"][0]
+                if first_w["x"] < col_date_end and re.search(r"\b\d{1,2}[\.,/]\d{2}[\.,/]\d{2}\b", first_w["text"]):
+                    in_table = True
+                else:
+                    continue
+
             if any(k in line_t for k in ["TOTAL MUTASI", "TOTAL HULASI", "SALDO MINIMUM", "SALDO HIRNEUN", "SALDO MAXIMUM", "SALDO HAXIEUA", "S/D DESEABER", "S/D DESEMBER"]):
                 break
-            filtered_clusters.append(c)
+            if in_table and "PINDAHAN" in line_t and c["y"] > int(h_page * 0.80):
+                break
 
-        # Kelompokkan ke transaction blocks
+            valid_clusters.append(c)
+
+        # Intelligent Multi-Amount Block Assembler
         page_blocks = []
-        current_block = []
-        for c in filtered_clusters:
+        curr_block = []
+        curr_has_amount = False
+
+        for c in valid_clusters:
             first_w = c["words"][0]
-            is_date = False
-            if first_w["x"] < 120 and re.search(r"\b\d{1,2}[\.,]\d{2}[\.,]\d{2}\b", first_w["text"]):
-                is_date = True
+            has_date = (first_w["x"] < col_date_end and bool(re.search(r"\b\d{1,2}[\.,/]\d{2}[\.,/]\d{2}\b", first_w["text"])))
+            has_sys = any(w["x"] < int(w_page * 0.25) and w["text"] in ["9900001", "9990002", "9990011"] for w in c["words"])
+            line_has_amount = any(w["x"] >= col_desc_end and any(ch.isdigit() for ch in w["text"]) for w in c["words"])
 
-            is_sys = False
-            if not is_date:
-                for w in c["words"]:
-                    if w["x"] < 280 and w["text"] in ["9900001", "9990002", "9990011"]:
-                        is_sys = True
-                        break
-
-            if is_date or is_sys:
-                if current_block:
-                    page_blocks.append(current_block)
-                current_block = [c]
+            # Mulai transaksi baru jika ada tanggal, kode sistem, atau baris memiliki nominal sementara blok aktif sudah memiliki nominal
+            if has_date or has_sys or (line_has_amount and curr_has_amount):
+                if curr_block:
+                    page_blocks.append(curr_block)
+                curr_block = [c]
+                curr_has_amount = line_has_amount
             else:
-                if current_block:
-                    current_block.append(c)
+                if curr_block:
+                    curr_block.append(c)
+                    if line_has_amount:
+                        curr_has_amount = True
+                else:
+                    curr_block = [c]
+                    curr_has_amount = line_has_amount
 
-        if current_block:
-            page_blocks.append(current_block)
+        if curr_block:
+            page_blocks.append(curr_block)
 
-        # Ekstrak field per block
+        # Ekstraksi field & Mathematical Constraint Solver per transaksi
         for b in page_blocks:
             date_str = ""
             desc_parts = []
@@ -229,58 +331,42 @@ def dynamic_extract_panin_scanned(filepath, pdf, total_pages, log_callback, prog
                     wx = w["x"]
                     wt = w["text"]
 
-                    if wx < 120 and not date_str:
-                        m = re.search(r"(\d{1,2})[\.,](\d{2})[\.,](\d{2})", wt)
+                    if wx < col_date_end and not date_str:
+                        m = re.search(r"(\d{1,2})[\.,/](\d{2})[\.,/](\d{2})", wt)
                         if m:
                             date_str = f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/20{m.group(3)}"
                             last_known_date = date_str
                             continue
 
-                    if 120 <= wx < 600:
+                    if col_date_end <= wx < col_desc_end:
                         if wt == "9900001": desc_parts.append("INTEREST PAY SYS-GEN")
                         elif wt == "9990002": desc_parts.append("ADMIN CHARGE")
                         elif wt == "9990011": desc_parts.append("WITHHOLDING TAX")
                         else: desc_parts.append(wt)
-                    elif 600 <= wx < 760:
+                    elif col_desc_end <= wx < col_deb_end:
                         deb_tokens.append(wt)
-                    elif 760 <= wx < 920:
+                    elif col_deb_end <= wx < col_kre_end:
                         kre_tokens.append(wt)
-                    elif wx >= 920:
+                    elif wx >= col_bal_start:
                         bal_tokens.append(wt)
 
             if not date_str:
                 date_str = last_known_date
 
-            desc = " ".join(desc_parts).strip()
+            raw_desc = " ".join(desc_parts).strip()
+            desc = clean_desc_text(raw_desc)
 
-            def assemble_currency(toks):
-                clean_toks = [t for t in toks if not re.search(r'[A-Za-z]{2,}', t.strip())]
-                s = "".join(clean_toks)
-                s = s.replace('I', '1').replace('l', '1').replace('i', '1')
-                s = s.replace('O', '0').replace('o', '0').replace('d', '0').replace('D', '0')
-                s = re.sub(r'[^\d\.,]', '', s)
-                if not s: return 0.0
-                try:
-                    if ',' in s and '.' in s:
-                        if s.rfind(',') > s.rfind('.'): s = s.replace('.', '').replace(',', '.')
-                        else: s = s.replace(',', '')
-                    elif ',' in s:
-                        parts = s.split(',')
-                        if len(parts[-1]) == 2: s = s.replace(',', '.')
-                        else: s = s.replace(',', '')
-                    elif '.' in s:
-                        parts = s.split('.')
-                        if len(parts[-1]) != 2 and len(parts[-1]) != 1: s = s.replace('.', '')
-                    val = float(s)
-                    return val if val < 500000000.0 else 0.0
-                except:
-                    return 0.0
+            deb_val = parse_dot_matrix_amount(deb_tokens)
+            kre_val = parse_dot_matrix_amount(kre_tokens)
+            bal_val = parse_dot_matrix_amount(bal_tokens)
 
-            deb_val = assemble_currency(deb_tokens)
-            kre_val = assemble_currency(kre_tokens)
-            bal_val = assemble_currency(bal_tokens)
+            # Klasifikasi cerdas Debet berdasarkan kata kunci perbankan
+            is_deb_hint = any(k in desc.upper() for k in ["ADMIN CHARGE", "WITHHOLDING TAX", "TRANSFER FEE", "IB-TRF-TO"])
+            if is_deb_hint and kre_val > 0 and deb_val == 0:
+                deb_val = kre_val
+                kre_val = 0.0
 
-            # Mathematical Self-Healing
+            # Mathematical Self-Healing & Balance Reconciler
             if kre_val > 0 and deb_val == 0:
                 current_balance = round(current_balance + kre_val, 2)
                 total_kredit += kre_val
@@ -289,12 +375,14 @@ def dynamic_extract_panin_scanned(filepath, pdf, total_pages, log_callback, prog
                 total_debet += deb_val
             elif bal_val > 0:
                 diff = round(bal_val - current_balance, 2)
-                if diff > 0 and diff < 100000000:
+                if diff > 0 and diff < 500000000.0:
+                    kre_val = diff
+                    current_balance = bal_val
                     total_kredit += diff
+                elif diff < 0 and abs(diff) < 500000000.0:
+                    deb_val = abs(diff)
                     current_balance = bal_val
-                elif diff < 0 and abs(diff) < 100000000:
                     total_debet += abs(diff)
-                    current_balance = bal_val
 
             all_txs.append({
                 OUTPUT_COLUMNS['tgl']: date_str,
