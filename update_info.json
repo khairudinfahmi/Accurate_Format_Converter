@@ -1,6 +1,6 @@
 {
   "latest_version": "4.5.2",
-  "download_url": "",
+  "download_url": "https://www.dropbox.com/scl/fi/gaf5y9klt16s469b6ogt6/Accurate_Converter_Setup_v4.5.2.exe?rlkey=x50d1n81u1lvdg0ru92x4b13t&st=c5v7jqjn&dl=1&ext=.exe",
   "release_notes": "Pembaruan v4.5.2:\n- Fitur Baru: Validasi Sumber Bank & Anti-Mismatch Guard (mencegah file mutasi BCA diproses di menu Panin, atau sebaliknya).\n- Penolakan Cerdas: Sistem mendeteksi tanda tangan dokumen resmi dan menolak otomatis pemrosesan jika pilihan bank tidak cocok dengan file.\n- Peringatan Dini: Notifikasi langsung saat memilih file jika format terdeteksi berbeda dari menu aktif."
 }
 
