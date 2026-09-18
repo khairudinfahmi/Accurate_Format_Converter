@@ -1,5 +1,5 @@
 {
   "latest_version": "4.5.0",
-  "download_url": "https://github.com/khairudinfahmi/Accurate_Format_Converter/releases/download/v4.5.0/Accurate_Converter_Setup_v4.5.exe",
+  "download_url": "https://www.dropbox.com/scl/fi/n2rpzrl41zowzycq8yva7/Accurate_Converter_Setup_v4.5.exe?rlkey=ht0xrrzofuwcqwkqpo3tjjs7q&st=m3rf4zud&dl=1&ext=.exe",
   "release_notes": "Pembaruan v4.5.0:\n- Fitur baru: Dukungan penuh e-Statement BCA Giro / KlikBCA Bisnis (multi-kolom Debit/Kredit) dengan deteksi otomatis.\n- Self-Healing Saldo Mathematics: Validasi matematis pergerakan saldo berjalan untuk mencegah tertukarnya transaksi Debit dan Kredit.\n- Rekonsiliasi Audit Otomatis: Pencocokan otomatis terhadap mutasi debit, kredit, dan saldo akhir resmi dokumen bank.\n- Ekstraksi metadata rekening Giro (Nomor Rekening & Nama Nasabah) secara akurat."
 }
