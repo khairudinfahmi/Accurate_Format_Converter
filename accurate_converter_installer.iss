@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Accurate Format Converter"
-#define MyAppVersion "4.5.0"
+#define MyAppVersion "4.5.1"
 #define MyAppPublisher "khairudinfahmi"
 #define MyAppExeName "Launcher.exe"
 
@@ -16,7 +16,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
-OutputBaseFilename=Accurate_Converter_Setup_v4.5
+OutputBaseFilename=Accurate_Converter_Setup_v4.5.1
 SetupIconFile=assets\rensa_logo.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma
@@ -40,6 +40,6 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{sys}\certutil.exe"; Parameters: "-addstore -f ""Root"" ""{app}\assets\khairudinfahmi_cert.cer"""; Flags: runhidden; StatusMsg: "Installing Security Certificate..."
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall runasoriginaluser
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 Filename: "{app}\{#MyAppExeName}"; Flags: nowait runasoriginaluser; Check: WizardSilent
 

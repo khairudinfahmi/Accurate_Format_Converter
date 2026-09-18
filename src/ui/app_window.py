@@ -19,7 +19,7 @@ from processors.bca_processor import process_bca
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        version_str = "4.5.0"
+        version_str = "4.5.1"
         try:
             exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             v_path = os.path.join(exe_dir, "version.txt")

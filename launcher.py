@@ -260,7 +260,19 @@ try {{
             except: pass
             self.launch_main_app()
 
+def ensure_single_launcher():
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        mutex = kernel32.CreateMutexW(None, False, "AccurateFormatConverter_Launcher_Mutex")
+        if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            sys.exit(0)
+        return mutex
+    except Exception:
+        return None
+
 if __name__ == "__main__":
+    _launcher_mutex = ensure_single_launcher()
     root = tk.Tk()
     app = LauncherApp(root)
     root.mainloop()

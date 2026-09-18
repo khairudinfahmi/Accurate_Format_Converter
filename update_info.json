@@ -1,5 +1,6 @@
 {
-  "latest_version": "4.5.0",
-  "download_url": "https://www.dropbox.com/scl/fi/n2rpzrl41zowzycq8yva7/Accurate_Converter_Setup_v4.5.exe?rlkey=ht0xrrzofuwcqwkqpo3tjjs7q&st=m3rf4zud&dl=1&ext=.exe",
-  "release_notes": "Pembaruan v4.5.0:\n- Fitur baru: Dukungan penuh e-Statement BCA Giro / KlikBCA Bisnis (multi-kolom Debit/Kredit) dengan deteksi otomatis.\n- Self-Healing Saldo Mathematics: Validasi matematis pergerakan saldo berjalan untuk mencegah tertukarnya transaksi Debit dan Kredit.\n- Rekonsiliasi Audit Otomatis: Pencocokan otomatis terhadap mutasi debit, kredit, dan saldo akhir resmi dokumen bank.\n- Ekstraksi metadata rekening Giro (Nomor Rekening & Nama Nasabah) secara akurat."
+  "latest_version": "4.5.1",
+  "download_url": "https://www.dropbox.com/scl/fi/iseya611jka04cl80fyud/Accurate_Converter_Setup_v4.5.1.exe?rlkey=yun2gkm5ucntxploiudz2i9o0&st=3xyz8w6g&dl=1&ext=.exe",
+  "release_notes": "Pembaruan v4.5.1:\n- Perbaikan Jendela Ganda (Dual-Window Fix): Mengeliminasi duplikasi pemanggilan launcher saat instalasi silent auto-update.\n- Proteksi Single-Instance Mutex: Mencegah terbukanya dua jendela aplikasi sekaligus baik via launcher maupun direct shortcut.\n- Membawa jendela aplikasi yang sudah aktif ke layar utama jika aplikasi dibuka kembali."
 }
+
