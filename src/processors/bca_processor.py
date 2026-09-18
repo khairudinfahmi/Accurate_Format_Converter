@@ -523,6 +523,12 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
 
 def process_bca(filepath, log_callback, progress_callback, success_callback, error_callback):
     try:
+        # Guard Check: Tolak jika terdeteksi dokumen bank lain (misal Panin, Mandiri)
+        from utils.bank_validator import detect_bank_from_file
+        detected_bank, reason = detect_bank_from_file(filepath)
+        if detected_bank and detected_bank != "BCA":
+            raise Exception(f"File ini terdeteksi sebagai dokumen mutasi BANK {detected_bank.upper()}, bukan BANK BCA ({reason}). Silakan ubah pilihan bank ke '{detected_bank}'.")
+
         if filepath.lower().endswith('.csv'):
             _process_bca_csv(filepath, log_callback, progress_callback, success_callback, error_callback)
             return

@@ -13,13 +13,14 @@ from PIL import Image
 from utils.config_manager import load_config, save_config
 from utils.helpers import get_windows_theme, resource_path
 from utils.file_exporter import save_exact_xls, save_invalid_dates
+from utils.bank_validator import validate_bank_selection, detect_bank_from_file
 from processors.panin_processor import process_panin, OUTPUT_COLUMNS
 from processors.bca_processor import process_bca
 
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        version_str = "4.5.1"
+        version_str = "4.5.2"
         try:
             exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             v_path = os.path.join(exe_dir, "version.txt")
@@ -299,6 +300,15 @@ class UniversalAccurateConverter:
             self.path_var.set(f)
             self.log(f"File loaded: {os.path.basename(f)}")
             self.progress_bar.set(0)
+            
+            # Deteksi awal tanda tangan bank dokumen
+            detected, desc = detect_bank_from_file(f)
+            if detected:
+                current_bank = self.bank_var.get()
+                if detected.lower() != current_bank.lower():
+                    self.log(f"[PERINGATAN] File ini terdeteksi sebagai mutasi BANK {detected.upper()}! Pilihan menu saat ini adalah '{current_bank}'. Pastikan ubah pilihan bank sebelum proses.")
+                else:
+                    self.log(f"[INFO] {desc} ({detected}).")
 
     def show_copyable_dialog(self, title, message, path_to_copy=""):
         dialog = ctk.CTkToplevel(self.root)
@@ -343,9 +353,18 @@ class UniversalAccurateConverter:
             messagebox.showwarning("Peringatan", "Silakan pilih file mutasi terlebih dahulu.")
             self.log("[INFO] Proses dibatalkan: File belum dipilih.")
             return
+
+        bank = self.bank_var.get()
+        
+        # Validasi Ketat Kesesuaian Sumber Bank
+        is_valid, err_msg, detected_bank = validate_bank_selection(filepath, bank)
+        if not is_valid:
+            self.log(f"[REJECTED] {err_msg.replace(chr(10), ' ')}")
+            messagebox.showerror("Format Bank Tidak Sesuai", err_msg)
+            return
         
         filename = os.path.basename(filepath)
-        confirm = messagebox.askyesno("Konfirmasi", f"Mulai proses konversi untuk file ini?\n\nFile: {filename}")
+        confirm = messagebox.askyesno("Konfirmasi", f"Mulai proses konversi untuk file ini?\n\nFile: {filename}\nBank: {bank}")
         
         if confirm:
             self.btn_process.configure(state="disabled", text="Sedang diproses...")
@@ -361,6 +380,12 @@ class UniversalAccurateConverter:
         
         def handle_error(msg):
             self.root.after(0, lambda: self.reset_ui_state(is_error=True, error_msg=msg))
+
+        # Secondary Barrier: Pastikan kesesuaian bank di dalam thread pemrosesan
+        is_valid, err_msg, _ = validate_bank_selection(filepath, bank)
+        if not is_valid:
+            handle_error(err_msg)
+            return
         
         if bank == "Panin":
             process_panin(

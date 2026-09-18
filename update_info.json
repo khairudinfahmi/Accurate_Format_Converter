@@ -1,6 +1,7 @@
 {
-  "latest_version": "4.5.1",
-  "download_url": "https://www.dropbox.com/scl/fi/iseya611jka04cl80fyud/Accurate_Converter_Setup_v4.5.1.exe?rlkey=yun2gkm5ucntxploiudz2i9o0&st=3xyz8w6g&dl=1&ext=.exe",
-  "release_notes": "Pembaruan v4.5.1:\n- Perbaikan Jendela Ganda (Dual-Window Fix): Mengeliminasi duplikasi pemanggilan launcher saat instalasi silent auto-update.\n- Proteksi Single-Instance Mutex: Mencegah terbukanya dua jendela aplikasi sekaligus baik via launcher maupun direct shortcut.\n- Membawa jendela aplikasi yang sudah aktif ke layar utama jika aplikasi dibuka kembali."
+  "latest_version": "4.5.2",
+  "download_url": "",
+  "release_notes": "Pembaruan v4.5.2:\n- Fitur Baru: Validasi Sumber Bank & Anti-Mismatch Guard (mencegah file mutasi BCA diproses di menu Panin, atau sebaliknya).\n- Penolakan Cerdas: Sistem mendeteksi tanda tangan dokumen resmi dan menolak otomatis pemrosesan jika pilihan bank tidak cocok dengan file.\n- Peringatan Dini: Notifikasi langsung saat memilih file jika format terdeteksi berbeda dari menu aktif."
 }
+
 

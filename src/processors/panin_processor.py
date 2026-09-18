@@ -23,6 +23,12 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
         
         progress_callback(0.05)
         
+        # Guard Check: Tolak jika terdeteksi dokumen bank lain (misal BCA, Mandiri)
+        from utils.bank_validator import detect_bank_from_file
+        detected_bank, reason = detect_bank_from_file(filepath)
+        if detected_bank and detected_bank != "Panin":
+            raise Exception(f"File ini terdeteksi sebagai dokumen mutasi BANK {detected_bank.upper()}, bukan BANK PANIN ({reason}). Silakan ubah pilihan bank ke '{detected_bank}'.")
+        
         df_temp = None
         file_ext = filepath.lower()
         
