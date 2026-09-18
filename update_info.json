@@ -1,5 +1,5 @@
 {
-  "latest_version": "4.4.0",
-  "download_url": "https://www.dropbox.com/scl/fi/afgqw9vrv352i1fwnzdhy/Accurate_Converter_Setup_v4.4.exe?rlkey=2cf30xroj2iaz8eyopaz2wv40&st=sav500rm&dl=1&ext=.exe",
-  "release_notes": "Pembaruan v4.4.0:\n- Fitur baru: Konversi mutasi rekening koran Panin dari file PDF hasil scan fisik (printer dot-matrix) dengan verifikasi matematis 100% klop.\n- Mekanisme otomatis venv trampoline saat menjalankan aplikasi lewat terminal.\n- Peningkatan kestabilan runtime dan perbaikan modul dependensi."
+  "latest_version": "4.5.0",
+  "download_url": "https://github.com/khairudinfahmi/Accurate_Format_Converter/releases/download/v4.5.0/Accurate_Converter_Setup_v4.5.exe",
+  "release_notes": "Pembaruan v4.5.0:\n- Fitur baru: Dukungan penuh e-Statement BCA Giro / KlikBCA Bisnis (multi-kolom Debit/Kredit) dengan deteksi otomatis.\n- Self-Healing Saldo Mathematics: Validasi matematis pergerakan saldo berjalan untuk mencegah tertukarnya transaksi Debit dan Kredit.\n- Rekonsiliasi Audit Otomatis: Pencocokan otomatis terhadap mutasi debit, kredit, dan saldo akhir resmi dokumen bank.\n- Ekstraksi metadata rekening Giro (Nomor Rekening & Nama Nasabah) secara akurat."
 }
