@@ -281,7 +281,7 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
             deb_row_1 = float(first_row['real_deb'])
             kre_row_1 = float(first_row['real_kre'])
             
-            # Guard Baris Pertama: Cek indikasi keyword deskripsi jika baris pertama tertukar di file sumber
+            # Pemeriksaan Baris Pertama: Cek indikasi kata kunci deskripsi jika baris pertama tertukar di file sumber
             desc_0_u = str(first_row[OUTPUT_COLUMNS['desc']]).upper()
             is_obvious_kre = any(k in desc_0_u for k in [" FROM", "FROM ", "SETORAN", "BUNGA", " CR", "PAYMENT FROM", "TRF FROM"])
             is_obvious_deb = any(k in desc_0_u for k in [" TO", "TO ", "TARIKAN", "ADMIN", "CHARGE", "PAJAK", "TAX", "BIAYA", "FEE", " DB", "WITHHOLDING"])
@@ -301,7 +301,7 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
             saldo_awal_val = round(saldo_row_1 - kre_row_1 + deb_row_1, 2)
             current_balance = saldo_awal_val
             
-            # --- Direction Guard & Mathematical Balance Reconciler ---
+            # --- Validasi & Rekonsiliasi Saldo Kas (Koreksi Mutasi Tertukar) ---
             corrected_count = 0
             for idx in range(len(df_final)):
                 r_deb = float(df_final.at[idx, 'real_deb'])

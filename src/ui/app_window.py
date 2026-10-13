@@ -149,6 +149,12 @@ class UniversalAccurateConverter:
         else:
             self.logo_label.configure(image="")
 
+        if hasattr(self, 'chk_typo'):
+            if bank_name == "Panin":
+                self.chk_typo.pack(anchor="w")
+            else:
+                self.chk_typo.pack_forget()
+
     def setup_ui(self):
         self.root.configure(fg_color=("#F5F7FA", "#121212"))
         
@@ -233,12 +239,12 @@ class UniversalAccurateConverter:
         options_container.pack(fill="x", padx=35, pady=5)
         
         self.use_regex_var = tk.BooleanVar(value=False) 
-        chk_typo = ctk.CTkCheckBox(options_container, text="Rapikan deskripsi (Khusus Panin)", 
-                                   font=ctk.CTkFont(family="Inter", size=12),
-                                   variable=self.use_regex_var, corner_radius=6,
-                                   fg_color=("#3B82F6", "#3B82F6"), border_color=("#CBD5E1", "#4A5568"),
-                                   text_color=("#4F566B", "#A0AABF"))
-        chk_typo.pack(anchor="w")
+        self.chk_typo = ctk.CTkCheckBox(options_container, text="Rapikan spasi pada deskripsi transaksi", 
+                                        font=ctk.CTkFont(family="Inter", size=12),
+                                        variable=self.use_regex_var, corner_radius=6,
+                                        fg_color=("#3B82F6", "#3B82F6"), border_color=("#CBD5E1", "#4A5568"),
+                                        text_color=("#4F566B", "#A0AABF"))
+        self.chk_typo.pack(anchor="w")
         
         action_container = ctk.CTkFrame(main_frame, fg_color="transparent")
         action_container.pack(fill="x", padx=35, pady=20)
@@ -477,7 +483,7 @@ class UniversalAccurateConverter:
                             msg += f"\n\n{audit_table}"
                         self.show_copyable_dialog("Selesai", msg, path_to_copy=save_path)
                 else:
-                    raise Exception("Export failed.")
+                    raise Exception("Penyimpanan file Excel format Accurate gagal.")
             else:
                 self.update_progress(0)
                 self.log("[INFO] Penyimpanan dibatalkan oleh user.")
