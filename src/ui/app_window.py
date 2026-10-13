@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 import ctypes
 import threading
 import datetime
@@ -342,12 +343,28 @@ class UniversalAccurateConverter:
         btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
         btn_frame.pack(side="bottom", pady=(0, 10))
 
-        def copy_to_clipboard():
-            self.root.clipboard_clear()
-            self.root.clipboard_append(path_to_copy if path_to_copy else message)
-            self.root.update()
-            btn_copy.configure(text="Tersalin!")
-            dialog.after(2000, lambda: btn_copy.configure(text="Copy Lokasi"))
+        def open_file_location():
+            target = path_to_copy if path_to_copy else ""
+            if target:
+                try:
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(target)
+                except Exception:
+                    pass
+                try:
+                    norm_path = os.path.normpath(os.path.abspath(target))
+                    if os.path.isfile(norm_path):
+                        subprocess.Popen(f'explorer /select,"{norm_path}"')
+                    elif os.path.isdir(norm_path):
+                        os.startfile(norm_path)
+                    else:
+                        parent = os.path.dirname(norm_path)
+                        if os.path.isdir(parent):
+                            os.startfile(parent)
+                except Exception as e:
+                    self.log(f"[WARN] Gagal membuka lokasi di Explorer: {e}")
+            btn_open.configure(text="Terbuka!")
+            dialog.after(2000, lambda: btn_open.configure(text="Lihat Lokasi"))
 
         def copy_all_info():
             self.root.clipboard_clear()
@@ -356,9 +373,9 @@ class UniversalAccurateConverter:
             btn_copy_all.configure(text="Tersalin!")
             dialog.after(2000, lambda: btn_copy_all.configure(text="Copy Semua Rincian"))
 
-        btn_copy = ctk.CTkButton(btn_frame, text="Copy Lokasi", width=110, 
-                                 command=copy_to_clipboard, fg_color="#3498db", hover_color="#2980b9")
-        btn_copy.pack(side="left", padx=10)
+        btn_open = ctk.CTkButton(btn_frame, text="Lihat Lokasi", width=110, 
+                                 command=open_file_location, fg_color="#3498db", hover_color="#2980b9")
+        btn_open.pack(side="left", padx=10)
 
         if has_table:
             btn_copy_all = ctk.CTkButton(btn_frame, text="Copy Semua Rincian", width=140,
