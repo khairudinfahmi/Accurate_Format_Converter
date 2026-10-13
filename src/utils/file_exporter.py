@@ -50,7 +50,7 @@ def save_exact_xls(dataframe, filepath, num_dummy, columns):
             if pd.isna(val) or val == "" or val is None: sheet.write(excel_row, col_idx, "", st_gen)
             else:
                 try: sheet.write(excel_row, col_idx, float(val), st_num)
-                except: sheet.write(excel_row, col_idx, val, st_gen)
+                except Exception: sheet.write(excel_row, col_idx, val, st_gen)
 
         write_number_safe(2, row[2], s_num, s_gen)
         write_number_safe(3, row[3], s_num, s_gen)

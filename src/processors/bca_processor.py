@@ -1,7 +1,119 @@
 import re
 import csv
+import itertools
 import pdfplumber
 from utils.helpers import clean_currency
+
+def _reconcile_bca_transactions(transactions, saldo_awal, log_callback):
+    """
+    Rekonsiliasi matematis saldo berjenjang dengan Look-Ahead Cluster Solver:
+    - Jika saldo tercetak ada di setiap baris: evaluasi langsung per baris.
+    - Jika ada baris tanpa saldo tercetak sebelum baris dengan saldo tercetak (cluster multi-transaksi):
+      selesaikan kombinasi tanda (+ / -) mutasi agar total perubahan sama persis dengan saldo akhir cluster.
+    """
+    current_balance = saldo_awal
+    n = len(transactions)
+    i = 0
+    valid_count = 0
+    
+    while i < n:
+        j = i
+        while j < n and transactions[j].get("saldo_printed") is None:
+            j += 1
+            
+        if j < n:
+            target_balance = transactions[j]["saldo_printed"]
+            expected_diff = round(target_balance - current_balance, 2)
+            cluster_len = j - i + 1
+            
+            # Cek apakah tebakan awal sudah cocok
+            current_sum = sum((tx["mutasi"] if tx["tipe"] == "CR" else -tx["mutasi"]) for tx in transactions[i:j+1])
+            if abs(current_sum - expected_diff) > 0.01:
+                solved = False
+                
+                # Strategi 1: Single-Flip Solver O(N) - jika hanya 1 transaksi yang salah tanda
+                for idx_c in range(cluster_len):
+                    tx_c = transactions[i + idx_c]
+                    # Jika saat ini CR dihitung +m, bila diubah jadi DB perubahannya -2m
+                    delta = -2 * tx_c["mutasi"] if tx_c["tipe"] == "CR" else 2 * tx_c["mutasi"]
+                    if abs((current_sum + delta) - expected_diff) < 0.01:
+                        tx_c["tipe"] = "DB" if tx_c["tipe"] == "CR" else "CR"
+                        solved = True
+                        break
+                
+                # Strategi 2: Double-Flip Solver O(N^2) - jika ada 2 transaksi yang salah tanda
+                if not solved and cluster_len > 1:
+                    for idx_a, idx_b in itertools.combinations(range(cluster_len), 2):
+                        tx_a = transactions[i + idx_a]
+                        tx_b = transactions[i + idx_b]
+                        delta_a = -2 * tx_a["mutasi"] if tx_a["tipe"] == "CR" else 2 * tx_a["mutasi"]
+                        delta_b = -2 * tx_b["mutasi"] if tx_b["tipe"] == "CR" else 2 * tx_b["mutasi"]
+                        if abs((current_sum + delta_a + delta_b) - expected_diff) < 0.01:
+                            tx_a["tipe"] = "DB" if tx_a["tipe"] == "CR" else "CR"
+                            tx_b["tipe"] = "DB" if tx_b["tipe"] == "CR" else "CR"
+                            solved = True
+                            break
+                            
+                # Strategi 3: Combinatorial Search 2^N (untuk cluster kompleks <= 14)
+                if not solved and cluster_len <= 14:
+                    best_combo = None
+                    min_err = 999999999.0
+                    for signs in itertools.product([1, -1], repeat=cluster_len):
+                        combo_sum = sum(s * tx["mutasi"] for s, tx in zip(signs, transactions[i:j+1]))
+                        err = abs(combo_sum - expected_diff)
+                        if err < 0.01:
+                            best_combo = signs
+                            min_err = err
+                            break
+                        elif err < min_err:
+                            min_err = err
+                            best_combo = signs
+                            
+                    if best_combo and min_err < 0.01:
+                        for idx_c, s in enumerate(best_combo):
+                            transactions[i + idx_c]["tipe"] = "CR" if s > 0 else "DB"
+                        solved = True
+                elif not solved and cluster_len == 1:
+                    mut = transactions[i]["mutasi"]
+                    if abs(expected_diff - mut) < 0.01:
+                        transactions[i]["tipe"] = "CR"
+                    elif abs(expected_diff + mut) < 0.01:
+                        transactions[i]["tipe"] = "DB"
+                    elif abs(abs(expected_diff) - mut) < 0.01:
+                        transactions[i]["tipe"] = "CR" if expected_diff > 0 else "DB"
+                        
+            # Jalankan pergerakan saldo sepanjang cluster
+            for k in range(i, j + 1):
+                m = transactions[k]["mutasi"]
+                if transactions[k]["tipe"] == "CR":
+                    current_balance += m
+                else:
+                    current_balance -= m
+                transactions[k]["saldo"] = round(current_balance, 2)
+                valid_count += 1
+                log_msg = f"T: {transactions[k]['tanggal'].replace('\'','')} | {transactions[k]['tipe']}: {transactions[k]['mutasi']:,.2f} | S: {transactions[k]['saldo']:,.2f}"
+                log_callback(log_msg)
+                
+            current_balance = round(target_balance, 2)
+            transactions[j]["saldo"] = current_balance
+            i = j + 1
+        else:
+            for k in range(i, n):
+                m = transactions[k]["mutasi"]
+                if transactions[k]["tipe"] == "CR":
+                    current_balance += m
+                else:
+                    current_balance -= m
+                transactions[k]["saldo"] = round(current_balance, 2)
+                valid_count += 1
+                log_msg = f"T: {transactions[k]['tanggal'].replace('\'','')} | {transactions[k]['tipe']}: {transactions[k]['mutasi']:,.2f} | S: {transactions[k]['saldo']:,.2f}"
+                log_callback(log_msg)
+            break
+            
+    total_debet = sum(tx["mutasi"] for tx in transactions if tx["tipe"] == "DB")
+    total_kredit = sum(tx["mutasi"] for tx in transactions if tx["tipe"] == "CR")
+    
+    return transactions, current_balance, valid_count, total_debet, total_kredit
 
 def _process_bca_csv(filepath, log_callback, progress_callback, success_callback, error_callback):
     try:
@@ -18,6 +130,8 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
         nama = "NASABAH BCA"
         saldo_awal = 0.0
         saldo_akhir = 0.0
+        mutasi_debet_summary = None
+        mutasi_kredit_summary = None
         periode_raw = ""
         transactions = []
         
@@ -44,6 +158,12 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
             elif "Saldo Akhir :" in line_str:
                 match = re.search(r'Saldo Akhir\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
                 if match: saldo_akhir = clean_currency(match.group(1))
+            elif "Mutasi Debet :" in line_str or "Mutasi Debit :" in line_str:
+                match = re.search(r'Mutasi\s*Deb[ei]t\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
+                if match: mutasi_debet_summary = clean_currency(match.group(1))
+            elif "Mutasi Kredit :" in line_str:
+                match = re.search(r'Mutasi\s*Kredit\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
+                if match: mutasi_kredit_summary = clean_currency(match.group(1))
             
             if len(row) >= 5 and "Tanggal Transaksi" in row[0] and "Keterangan" in row[1]:
                 data_started = True
@@ -60,12 +180,13 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
                     jumlah_str = row[3].strip()
                     mutasi = 0.0
                     tipe = "CR"
-                    if " CR" in jumlah_str.upper():
+                    j_upper = jumlah_str.upper()
+                    if " CR" in j_upper or j_upper.endswith("CR") or re.search(r'\bCR\b', j_upper):
                         tipe = "CR"
-                        mutasi = clean_currency(jumlah_str.upper().replace(" CR", ""))
-                    elif " DB" in jumlah_str.upper():
+                        mutasi = clean_currency(re.sub(r'CR', '', j_upper, flags=re.IGNORECASE))
+                    elif " DB" in j_upper or j_upper.endswith("DB") or re.search(r'\bDB\b', j_upper):
                         tipe = "DB"
-                        mutasi = clean_currency(jumlah_str.upper().replace(" DB", ""))
+                        mutasi = clean_currency(re.sub(r'DB', '', j_upper, flags=re.IGNORECASE))
                     else:
                         mutasi = clean_currency(jumlah_str)
                     
@@ -81,23 +202,42 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
                         "saldo": saldo
                     })
                     
+        if not transactions:
+            raise Exception("File CSV berhasil dibaca, namun tidak ditemukan data transaksi BCA.")
+
+        # --- Fase 2 (CSV): Validasi Silang Matematika Saldo (Self-Healing Fail-Safe) ---
+        transactions, current_balance, valid_count, total_debet, total_kredit = _reconcile_bca_transactions(
+            transactions, saldo_awal, log_callback
+        )
+        
         progress_callback(0.9)
         
-        valid_count = len(transactions)
-        log_callback("-" * 45)
-        log_callback(f"Total Transaksi Valid: {valid_count}")
-        log_callback(f"Saldo Awal: {saldo_awal:,.2f}")
-        log_callback(f"Saldo Akhir: {saldo_akhir:,.2f}")
-        log_callback("-" * 45)
-        
-        if valid_count == 0:
-            raise Exception("File CSV berhasil dibaca, namun tidak ditemukan data transaksi BCA.")
+        from utils.helpers import format_audit_reconciliation_table
+        source_summary = {
+            "label": "Ringkasan CSV BCA",
+            "saldo_awal": saldo_awal,
+            "debet": mutasi_debet_summary if mutasi_debet_summary is not None else total_debet,
+            "kredit": mutasi_kredit_summary if mutasi_kredit_summary is not None else total_kredit,
+            "saldo_akhir": saldo_akhir if saldo_akhir > 0 else current_balance,
+            "count": valid_count
+        }
+        output_summary = {
+            "label": "Hasil Format Accurate",
+            "saldo_awal": saldo_awal,
+            "debet": total_debet,
+            "kredit": total_kredit,
+            "saldo_akhir": current_balance,
+            "count": valid_count
+        }
+        audit_table = format_audit_reconciliation_table("BCA CSV", source_summary, output_summary)
+        log_callback("\n" + audit_table)
+        transactions[0]["_audit_table"] = audit_table
         
         # Simpan metadata periode di transaksi pertama (untuk Format 3 generator)
         if periode_raw and transactions:
             transactions[0]["_periode_raw"] = periode_raw
             
-        success_callback(transactions, rekening, nama, saldo_awal, saldo_akhir, filepath)
+        success_callback(transactions, rekening, nama, saldo_awal, current_balance, filepath)
         
     except Exception as e:
         error_callback(str(e))
@@ -221,13 +361,13 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
                     elif 280 <= x0 < 315 and re.match(r'^\d{4}$', t):
                         cabang = t
                     elif 360 <= x0 < 425:
-                        if re.match(r'^[\d\,]+\.\d{2}$', t):
+                        if re.match(r'^[\d\.,]+$', t) and any(c.isdigit() for c in t) and not re.search(r'[a-zA-Z]', t):
                             debet_val = clean_currency(t)
                     elif 425 <= x0 < 490:
-                        if re.match(r'^[\d\,]+\.\d{2}$', t):
+                        if re.match(r'^[\d\.,]+$', t) and any(c.isdigit() for c in t) and not re.search(r'[a-zA-Z]', t):
                             kredit_val = clean_currency(t)
                     elif x0 >= 490:
-                        if re.match(r'^[\d\,]+\.\d{2}$', t):
+                        if re.match(r'^[\d\.,]+$', t) and any(c.isdigit() for c in t) and not re.search(r'[a-zA-Z]', t):
                             saldo_pr = clean_currency(t)
                             
             if not date:
@@ -269,41 +409,10 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
             else:
                 saldo_awal = 0.0
 
-        current_balance = saldo_awal
-        valid_count = 0
-        for tx in transactions:
-            mutasi_val = tx["mutasi"]
-            
-            # --- Fase 2 (Giro): Validasi Silang Matematika Saldo (Self-Healing Fail-Safe) ---
-            if tx["saldo_printed"] is not None:
-                actual = round(tx["saldo_printed"], 2)
-                prev = round(current_balance, 2)
-                diff = round(actual - prev, 2)
-                
-                # Koreksi jika terjadi pergeseran kolom atau anomali cetak
-                if abs(diff - mutasi_val) < 0.01:
-                    tx["tipe"] = "CR"
-                elif abs(diff + mutasi_val) < 0.01:
-                    tx["tipe"] = "DB"
-                elif abs(abs(diff) - mutasi_val) < 0.01:
-                    tx["tipe"] = "CR" if diff > 0 else "DB"
-                    
-                current_balance = actual
-            else:
-                if tx["tipe"] == "CR":
-                    current_balance += mutasi_val
-                else:
-                    current_balance -= mutasi_val
-                current_balance = round(current_balance, 2)
-                
-            tx["saldo"] = current_balance
-            valid_count += 1
-            
-            log_msg = f"T: {tx['tanggal'].replace('\'','')} | {tx['tipe']}: {tx['mutasi']:,.2f} | S: {tx['saldo']:,.2f}"
-            log_callback(log_msg)
-            
-        total_debet = sum(tx["mutasi"] for tx in transactions if tx["tipe"] == "DB")
-        total_kredit = sum(tx["mutasi"] for tx in transactions if tx["tipe"] == "CR")
+        # --- Fase 2 (Giro): Validasi Silang Matematika Saldo (Self-Healing Fail-Safe) ---
+        transactions, current_balance, valid_count, total_debet, total_kredit = _reconcile_bca_transactions(
+            transactions, saldo_awal, log_callback
+        )
         
         log_callback("-" * 45)
         log_callback(f"Total Transaksi Valid: {valid_count}")
@@ -313,14 +422,27 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
         log_callback(f"Saldo Akhir: {current_balance:,.2f}")
         
         # Validasi Rekonsiliasi Otomatis terhadap Ringkasan Bank
-        if mutasi_debit_summary is not None and abs(total_debet - mutasi_debit_summary) < 0.01:
-            log_callback(f"[AUDIT] Mutasi Debit 100% cocok dengan ringkasan bank (Rp {total_debet:,.2f})")
-        if mutasi_kredit_summary is not None and abs(total_kredit - mutasi_kredit_summary) < 0.01:
-            log_callback(f"[AUDIT] Mutasi Kredit 100% cocok dengan ringkasan bank (Rp {total_kredit:,.2f})")
-        if saldo_akhir is not None and abs(current_balance - saldo_akhir) < 0.01:
-            log_callback(f"[AUDIT] Saldo Akhir 100% cocok dengan ringkasan bank (Rp {current_balance:,.2f})")
-        log_callback("-" * 45)
-
+        from utils.helpers import format_audit_reconciliation_table
+        source_summary = {
+            "label": "Ringkasan Giro KlikBCA",
+            "saldo_awal": saldo_awal,
+            "debet": mutasi_debit_summary if mutasi_debit_summary is not None else total_debet,
+            "kredit": mutasi_kredit_summary if mutasi_kredit_summary is not None else total_kredit,
+            "saldo_akhir": saldo_akhir if saldo_akhir is not None else current_balance,
+            "count": valid_count
+        }
+        output_summary = {
+            "label": "Hasil Format Accurate",
+            "saldo_awal": saldo_awal,
+            "debet": total_debet,
+            "kredit": total_kredit,
+            "saldo_akhir": current_balance,
+            "count": valid_count
+        }
+        audit_table = format_audit_reconciliation_table("BCA Giro", source_summary, output_summary)
+        log_callback("\n" + audit_table)
+        transactions[0]["_audit_table"] = audit_table
+        
         if periode_raw and transactions:
             transactions[0]["_periode_raw"] = periode_raw
 
@@ -340,6 +462,7 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
         saldo_awal = 0.0
         rekening = ""
         nama = ""
+        periode_raw = ""
         transactions = []
         all_lines = []
         
@@ -355,6 +478,10 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
                     match = re.search(r'NO\.\s*REKENING\s*:\s*(\d+)', line, re.IGNORECASE)
                     if match: rekening = match.group(1)
             
+            per_m = re.search(r'PERIODE\s*:?\s*([^\n\r]+)', text0, re.IGNORECASE)
+            if per_m:
+                periode_raw = per_m.group(1).strip()
+            
             words = page0.extract_words()
             for w in words:
                 if w['top'] > 70 and w['top'] < 90 and w['x0'] < 100:
@@ -366,6 +493,8 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
         if not nama: nama = "NASABAH BCA"
 
         log_callback(f"Rekening: {rekening} | Nama: {nama}")
+        if periode_raw:
+            log_callback(f"Periode: {periode_raw}")
 
         for page_idx, page in enumerate(pdf.pages):
             progress_callback(0.1 + (0.7 * (page_idx / total_pages)))
@@ -435,13 +564,19 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
                     elif 60 <= w['x0'] < 330:
                         desc_parts.append(w['text'])
                     elif 330 <= w['x0'] < 480:
-                        if re.match(r'[\d\,]+\.\d{2}', w['text']):
-                            mutasi = clean_currency(w['text'])
-                        elif w['text'].strip().upper() in ('DB', 'CR'):
-                            mutasi_zone_marker = w['text'].strip().upper()
+                        wt_clean = w['text'].strip()
+                        attached_m = re.search(r'^([\d\.,]+)\s*(CR|DB)$', wt_clean, re.IGNORECASE)
+                        if attached_m:
+                            mutasi = clean_currency(attached_m.group(1))
+                            mutasi_zone_marker = attached_m.group(2).upper()
+                        elif re.match(r'^[\d\.,]+$', wt_clean) and any(c.isdigit() for c in wt_clean) and not re.search(r'[a-zA-Z]', wt_clean):
+                            mutasi = clean_currency(wt_clean)
+                        elif wt_clean.upper() in ('DB', 'CR'):
+                            mutasi_zone_marker = wt_clean.upper()
                     elif w['x0'] >= 480:
-                        if re.match(r'[\d\,]+\.\d{2}', w['text']):
-                            saldo_pr = clean_currency(w['text'])
+                        wt_clean = w['text'].strip()
+                        if re.match(r'^[\d\.,]+$', wt_clean) and any(c.isdigit() for c in wt_clean) and not re.search(r'[a-zA-Z]', wt_clean):
+                            saldo_pr = clean_currency(wt_clean)
                             
             if not date: continue
             desc = " ".join(desc_parts).strip()
@@ -476,45 +611,46 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
                 "saldo_printed": saldo_pr
             })
     
-        # --- Fase 2: Koreksi tipe menggunakan saldo sebagai sumber kebenaran ---
-        current_balance = saldo_awal
-        valid_count = 0
-        for tx in transactions:
-            mutasi_val = tx["mutasi"]
+        # --- Fase 2: Koreksi tipe menggunakan saldo sebagai sumber kebenaran (Look-Ahead Cluster Solver) ---
+        transactions, current_balance, valid_count, total_debet, total_kredit = _reconcile_bca_transactions(
+            transactions, saldo_awal, log_callback
+        )
             
-            if tx["saldo_printed"] is not None:
-                actual = round(tx["saldo_printed"], 2)
-                prev = round(current_balance, 2)
-                diff = round(actual - prev, 2)
-                
-                # Tentukan tipe berdasarkan pergerakan saldo (sumber kebenaran)
-                if abs(diff - mutasi_val) < 0.01:
-                    tx["tipe"] = "CR"
-                elif abs(diff + mutasi_val) < 0.01:
-                    tx["tipe"] = "DB"
-                
-                current_balance = actual
-            else:
-                if tx["tipe"] == "CR":
-                    current_balance += mutasi_val
-                else:
-                    current_balance -= mutasi_val
-            
-            tx["saldo"] = round(current_balance, 2)
-            valid_count += 1
-            
-            log_msg = f"T: {tx['tanggal'].replace('\'','')} | {tx['tipe']}: {tx['mutasi']:,.2f} | S: {tx['saldo']:,.2f}"
-            log_callback(log_msg)
-            
-        log_callback("-" * 45)
-        log_callback(f"Total Transaksi Valid: {valid_count}")
-        log_callback(f"Saldo Awal: {saldo_awal:,.2f}")
-        log_callback(f"Saldo Akhir: {current_balance:,.2f}")
-        log_callback("-" * 45)
+        full_text = "\n".join([p.extract_text() or "" for p in pdf.pages])
+        m_cr = re.search(r'MUTASI\s*CR\s*:?\s*(?:[\d]+\s+)?([\d\.,]+)', full_text, re.IGNORECASE)
+        mutasi_cr_sum = clean_currency(m_cr.group(1)) if m_cr else None
+        m_db = re.search(r'MUTASI\s*DB\s*:?\s*(?:[\d]+\s+)?([\d\.,]+)', full_text, re.IGNORECASE)
+        mutasi_db_sum = clean_currency(m_db.group(1)) if m_db else None
+        m_sa = re.search(r'SALDO\s*AKHIR\s*:?\s*([\d\.,]+)', full_text, re.IGNORECASE)
+        saldo_akhir_sum = clean_currency(m_sa.group(1)) if m_sa else None
+
+        from utils.helpers import format_audit_reconciliation_table
+        source_summary = {
+            "label": "Ringkasan BCA Tahapan",
+            "saldo_awal": saldo_awal,
+            "debet": mutasi_db_sum if mutasi_db_sum is not None else total_debet,
+            "kredit": mutasi_cr_sum if mutasi_cr_sum is not None else total_kredit,
+            "saldo_akhir": saldo_akhir_sum if saldo_akhir_sum is not None else current_balance,
+            "count": valid_count
+        }
+        output_summary = {
+            "label": "Hasil Format Accurate",
+            "saldo_awal": saldo_awal,
+            "debet": total_debet,
+            "kredit": total_kredit,
+            "saldo_akhir": current_balance,
+            "count": valid_count
+        }
+        audit_table = format_audit_reconciliation_table("BCA Tahapan", source_summary, output_summary)
+        log_callback("\n" + audit_table)
+        transactions[0]["_audit_table"] = audit_table
         
         if valid_count == 0:
             raise Exception("File PDF berhasil dibaca, namun tidak ditemukan data transaksi BCA. Pastikan file yang dipilih adalah mutasi rekening BCA yang valid.")
             
+        if periode_raw and transactions:
+            transactions[0]["_periode_raw"] = periode_raw
+
         progress_callback(0.9)
         success_callback(transactions, rekening, nama, saldo_awal, current_balance, filepath)
         

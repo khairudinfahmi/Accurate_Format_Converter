@@ -6,7 +6,7 @@ app_data_dir = os.path.join(os.getenv('APPDATA', os.path.expanduser('~')), 'Rens
 if not os.path.exists(app_data_dir):
     try:
         os.makedirs(app_data_dir)
-    except:
+    except Exception:
         pass
 
 CONFIG_FILE = os.path.join(app_data_dir, "rensa_converter_config.json")
@@ -16,7 +16,7 @@ def load_config():
         try:
             with open(CONFIG_FILE, 'r') as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return {"show_tutorial": True}
 

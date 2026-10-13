@@ -9,3 +9,7 @@ Output/
 *.log
 sample/
 Hasil Konversi*/
+*.pdf
+*.xls
+*.xlsx
+*.csv

@@ -49,7 +49,7 @@ class UniversalAccurateConverter:
         
         try:
             self.root.state('zoomed')
-        except:
+        except Exception:
             pass
 
         self.root.after(100, self.force_maximize)
@@ -67,7 +67,7 @@ class UniversalAccurateConverter:
         except Exception:
             try:
                 self.root.attributes('-zoomed', True)
-            except:
+            except Exception:
                 pass
 
     def show_tutorial(self):
@@ -80,7 +80,7 @@ class UniversalAccurateConverter:
         
         if os.path.exists(self.icon_path):
             try: tut_win.after(200, lambda: tut_win.iconbitmap(self.icon_path))
-            except: pass
+            except Exception: pass
 
         tut_win.geometry("550x450")
         tut_win.resizable(False, False)
@@ -313,13 +313,21 @@ class UniversalAccurateConverter:
     def show_copyable_dialog(self, title, message, path_to_copy=""):
         dialog = ctk.CTkToplevel(self.root)
         dialog.title(title)
-        dialog.geometry("550x280")
+        
+        has_table = "LEMBAR AUDIT REKONSILIASI" in message or "=====" in message
+        if has_table:
+            dialog.geometry("780x520")
+            font_choice = ctk.CTkFont(family="Consolas", size=11)
+        else:
+            dialog.geometry("550x280")
+            font_choice = ctk.CTkFont(size=13)
+            
         dialog.transient(self.root)
         dialog.grab_set()
 
         if os.path.exists(self.icon_path):
             try: dialog.after(200, lambda: dialog.iconbitmap(self.icon_path))
-            except: pass
+            except Exception: pass
 
         frame = ctk.CTkFrame(dialog, corner_radius=15)
         frame.pack(padx=20, pady=20, fill="both", expand=True)
@@ -334,14 +342,26 @@ class UniversalAccurateConverter:
             btn_copy.configure(text="Tersalin!")
             dialog.after(2000, lambda: btn_copy.configure(text="Copy Lokasi"))
 
-        btn_copy = ctk.CTkButton(btn_frame, text="Copy Lokasi", width=100, 
+        def copy_all_info():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(message)
+            self.root.update()
+            btn_copy_all.configure(text="Tersalin!")
+            dialog.after(2000, lambda: btn_copy_all.configure(text="Copy Semua Rincian"))
+
+        btn_copy = ctk.CTkButton(btn_frame, text="Copy Lokasi", width=110, 
                                  command=copy_to_clipboard, fg_color="#3498db", hover_color="#2980b9")
         btn_copy.pack(side="left", padx=10)
+
+        if has_table:
+            btn_copy_all = ctk.CTkButton(btn_frame, text="Copy Semua Rincian", width=140,
+                                         command=copy_all_info, fg_color="#10B981", hover_color="#059669")
+            btn_copy_all.pack(side="left", padx=10)
 
         btn_ok = ctk.CTkButton(btn_frame, text="OK", width=100, command=dialog.destroy)
         btn_ok.pack(side="left", padx=10)
 
-        txt_area = ctk.CTkTextbox(frame, wrap="word", font=ctk.CTkFont(size=13))
+        txt_area = ctk.CTkTextbox(frame, wrap="word" if not has_table else "none", font=font_choice)
         txt_area.pack(side="top", padx=10, pady=(10, 10), fill="both", expand=True)
         txt_area.insert("0.0", message)
         txt_area.configure(state="disabled")
@@ -441,14 +461,19 @@ class UniversalAccurateConverter:
                     self.update_progress(1.0)
                     self.log(f"[OK] Saved: {os.path.basename(save_path)}")
                     
+                    audit_table = getattr(df_output, 'attrs', {}).get("audit_table", "")
                     if invalid_dates_data:
                         error_file = save_invalid_dates(invalid_dates_data, filepath, log_callback=self.log)
                         msg = f"File berhasil disimpan!\nLokasi:\n{save_path}\n\nValid: {len(df_output) - 3 - num_dummy} baris\nDummy: {num_dummy} baris\nInvalid Date: {len(invalid_dates_data)} baris (diabaikan)"
                         if error_file:
                             msg += f"\nFile error saved: {os.path.basename(error_file)}"
+                        if audit_table:
+                            msg += f"\n\n{audit_table}"
                         self.show_copyable_dialog("Selesai dengan Peringatan", msg, path_to_copy=save_path)
                     else:
                         msg = f"File berhasil disimpan!\nLokasi:\n{save_path}\n\nValid: {len(df_output) - 3 - num_dummy} baris\nDummy: {num_dummy} baris"
+                        if audit_table:
+                            msg += f"\n\n{audit_table}"
                         self.show_copyable_dialog("Selesai", msg, path_to_copy=save_path)
                 else:
                     raise Exception("Export failed.")
@@ -508,8 +533,12 @@ class UniversalAccurateConverter:
                         else: total_debet += tx["mutasi"]
                         
                         safe_ket = tx["keterangan"].replace(',', ' ').replace('"', '')
+                        tgl_raw = tx["tanggal"].replace("'", "").strip()
+                        parts = tgl_raw.split('/')
+                        tgl_fmt1 = f"'{parts[0]:0>2}/{parts[1]:0>2}" if len(parts) >= 2 else f"'{tgl_raw}"
+                        
                         writer.writerow([
-                            tx["tanggal"],
+                            tgl_fmt1,
                             safe_ket,
                             tx["cabang"],
                             f"{tx['mutasi']:.2f}",
@@ -523,13 +552,28 @@ class UniversalAccurateConverter:
                     writer.writerow(["Saldo Akhir", "=", f"{saldo_akhir:.2f}"])
                     writer.writerow([])
 
+                # Hitung tahun efektif dari metadata dokumen jika tersedia (hindari hardcode tahun sekarang)
+                periode_from_meta = transactions[0].get("_periode_raw", "") if transactions else ""
+                year_match = re.search(r'\b(20\d{2}|19\d{2})\b', periode_from_meta) if periode_from_meta else None
+                effective_year = year_match.group(1) if year_match else str(datetime.datetime.now().year)
+
+                def format_bca_ddmmyyyy(raw_date, year_fallback):
+                    d = str(raw_date).replace("'", "").strip()
+                    if not d: return ""
+                    p = d.split('/')
+                    if len(p) == 2:
+                        return f"{p[0]:0>2}/{p[1]:0>2}/{year_fallback}"
+                    elif len(p) >= 3:
+                        return f"{p[0]:0>2}/{p[1]:0>2}/{p[2]}"
+                    return d
+
                 # === BACKUP: Save XLS ===
                 import pandas as pd
                 cols = list(OUTPUT_COLUMNS.values())
                 final_data = []
                 
                 for tx in transactions:
-                    tgl_clean = tx["tanggal"].replace("'", "") + "/" + str(datetime.datetime.now().year) if len(tx["tanggal"]) > 1 else ""
+                    tgl_clean = format_bca_ddmmyyyy(tx["tanggal"], effective_year)
                     debet_val = tx['mutasi'] if tx["tipe"] == "DB" else ""
                     kredit_val = tx['mutasi'] if tx["tipe"] == "CR" else ""
                     final_data.append({
@@ -574,26 +618,22 @@ class UniversalAccurateConverter:
                     # Baris 3-6: Metadata (single-cell strings)
                     writer3 = csv.writer(f, lineterminator='\n', quoting=csv.QUOTE_ALL)
                     
-                    # Hitung periode: gunakan metadata asli dari CSV jika tersedia
-                    periode_from_meta = transactions[0].get("_periode_raw", "") if transactions else ""
-                    year = str(datetime.datetime.now().year)
-                    
                     if periode_from_meta:
-                        # Dari CSV input: gunakan periode asli
+                        # Dari dokumen input: gunakan periode asli
                         periode_str = periode_from_meta
                     else:
-                        # Dari PDF input: hitung dari tanggal transaksi
+                        # Hitung dari tanggal transaksi dengan tahun efektif
                         dates = []
                         for tx in transactions:
-                            raw = tx["tanggal"].replace("'", "")  # "'05/12" -> "05/12"
+                            raw = tx["tanggal"].replace("'", "")
                             dates.append(raw)
                         if dates:
-                            full_dates = [d + "/" + year for d in dates]
+                            full_dates = [format_bca_ddmmyyyy(d, effective_year) for d in dates]
                             tgl_awal = full_dates[0]
                             tgl_akhir = full_dates[-1]
                         else:
-                            tgl_awal = f"01/01/{year}"
-                            tgl_akhir = f"31/12/{year}"
+                            tgl_awal = f"01/01/{effective_year}"
+                            tgl_akhir = f"31/12/{effective_year}"
                         periode_str = f"{tgl_awal} - {tgl_akhir}"
                     
                     writer3.writerow([f"No. rekening : {rekening}"])
@@ -608,7 +648,7 @@ class UniversalAccurateConverter:
                     count_cr = 0
                     count_db = 0
                     for tx in transactions:
-                        tgl_clean = tx["tanggal"].replace("'", "") + "/" + year
+                        tgl_clean = format_bca_ddmmyyyy(tx["tanggal"], effective_year)
                         cabang_clean = tx["cabang"].replace("'", "")
                         jumlah_str = f"{tx['mutasi']:,.2f} {tx['tipe']}"
                         saldo_str = f"{tx['saldo']:,.2f}"
@@ -631,7 +671,11 @@ class UniversalAccurateConverter:
                 self.log(f"[OK] BCA CSV Saved: {os.path.basename(save_path)}")
                 self.log(f"[OK] BCA Excel Formatter Saved: {os.path.basename(backup_path)}")
                 self.log(f"[OK] BCA KlikBCA CSV Saved: {os.path.basename(klikbca_path)}")
-                self.show_copyable_dialog("Selesai BCA", f"Tiga File BCA berhasil disimpan dalam folder:\n{target_dir}\n\n1. Template Rekening Tahapan\n2. Template Excel Formatter\n3. Template Rekening Giro\n\nTotal Data: {len(transactions)} baris", path_to_copy=target_dir)
+                audit_table = transactions[0].get("_audit_table", "") if transactions else ""
+                msg = f"Tiga File BCA berhasil disimpan dalam folder:\n{target_dir}\n\n1. Template Rekening Tahapan\n2. Template Excel Formatter\n3. Template Rekening Giro\n\nTotal Data: {len(transactions)} baris"
+                if audit_table:
+                    msg += f"\n\n{audit_table}"
+                self.show_copyable_dialog("Selesai BCA", msg, path_to_copy=target_dir)
             else:
                 self.update_progress(0)
                 self.log("[INFO] Penyimpanan dibatalkan oleh user.")

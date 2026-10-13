@@ -5,7 +5,7 @@ try:
     _ = (xlrd, openpyxl)
 except ImportError:
     pass
-from utils.helpers import clean_currency, clean_desc, parse_date_tolerant
+from utils.helpers import clean_currency, clean_desc, parse_date_tolerant, format_audit_reconciliation_table
 
 OUTPUT_COLUMNS = {
     'tgl': 'tanggal',
@@ -114,17 +114,17 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
                                     elif 130 <= w['x0'] < 250:
                                         desc_parts.append(w['text'])
                                     elif 250 <= w['x0'] < 360:
-                                        if re.match(r'[\d\,]+\.\d{2}', w['text']):
+                                        if re.match(r'^[\d\.,]+$', w['text']) and any(c.isdigit() for c in w['text']) and not re.search(r'[a-zA-Z]', w['text']):
                                             debit_val = w['text']
                                         else:
                                             desc_parts.append(w['text'])
                                     elif 360 <= w['x0'] < 460:
-                                        if re.match(r'[\d\,]+\.\d{2}', w['text']):
+                                        if re.match(r'^[\d\.,]+$', w['text']) and any(c.isdigit() for c in w['text']) and not re.search(r'[a-zA-Z]', w['text']):
                                             kredit_val = w['text']
                                         else:
                                             desc_parts.append(w['text'])
                                     elif w['x0'] >= 460:
-                                        if re.match(r'[\d\,]+\.\d{2}', w['text']):
+                                        if re.match(r'^[\d\.,]+$', w['text']) and any(c.isdigit() for c in w['text']) and not re.search(r'[a-zA-Z]', w['text']):
                                             saldo_val = w['text']
                             
                             if not date: continue
@@ -248,7 +248,7 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
                     OUTPUT_COLUMNS['deb']: debit if debit != 0 else "",
                     OUTPUT_COLUMNS['kre']: kredit if kredit != 0 else "",
                     OUTPUT_COLUMNS['bal']: saldo,
-                    'real_deb': debit, 'real_kre': kredit, 'date_obj': parsed_date 
+                    'real_deb': debit, 'real_kre': kredit, 'date_obj': parsed_date, 'baris_no': i+1
                 })
             except Exception as e:
                 log_callback(f"[ERR] Row {i+1}: {str(e)}")
@@ -269,15 +269,86 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
         df_final = pd.DataFrame(final_data)
         df_final[OUTPUT_COLUMNS['tgl']] = df_final['date_obj'].dt.strftime('%d/%m/%Y') # type: ignore
         
+        raw_source_deb = round(float(df_final['real_deb'].sum()), 2)
+        raw_source_kre = round(float(df_final['real_kre'].sum()), 2)
+        raw_source_count = len(df_final)
+        
         if len(df_final) > 0:
             first_row = df_final.iloc[0]
             saldo_row_1 = float(first_row[OUTPUT_COLUMNS['bal']])
             deb_row_1 = float(first_row['real_deb'])
             kre_row_1 = float(first_row['real_kre'])
             
-            saldo_awal_val = saldo_row_1 - kre_row_1 + deb_row_1
-            total_kredit = df_final['real_kre'].sum()
-            total_debet = df_final['real_deb'].sum()
+            # Guard Baris Pertama: Cek indikasi keyword deskripsi jika baris pertama tertukar di file sumber
+            desc_0_u = str(first_row[OUTPUT_COLUMNS['desc']]).upper()
+            is_obvious_kre = any(k in desc_0_u for k in [" FROM", "FROM ", "SETORAN", "BUNGA", " CR", "PAYMENT FROM", "TRF FROM"])
+            is_obvious_deb = any(k in desc_0_u for k in [" TO", "TO ", "TARIKAN", "ADMIN", "CHARGE", "PAJAK", "TAX", "BIAYA", "FEE", " DB", "WITHHOLDING"])
+            if is_obvious_kre and deb_row_1 > 0 and kre_row_1 == 0:
+                log_callback(f"Row 1: Koreksi awal berdasarkan deskripsi ('{desc_0_u[:35]}') -> Dipindahkan dari Debet ke Kredit")
+                kre_row_1 = deb_row_1
+                deb_row_1 = 0.0
+                df_final.at[0, 'real_deb'] = 0.0
+                df_final.at[0, 'real_kre'] = kre_row_1
+            elif is_obvious_deb and kre_row_1 > 0 and deb_row_1 == 0:
+                log_callback(f"Row 1: Koreksi awal berdasarkan deskripsi ('{desc_0_u[:35]}') -> Dipindahkan dari Kredit ke Debet")
+                deb_row_1 = kre_row_1
+                kre_row_1 = 0.0
+                df_final.at[0, 'real_kre'] = 0.0
+                df_final.at[0, 'real_deb'] = deb_row_1
+
+            saldo_awal_val = round(saldo_row_1 - kre_row_1 + deb_row_1, 2)
+            current_balance = saldo_awal_val
+            
+            # --- Direction Guard & Mathematical Balance Reconciler ---
+            corrected_count = 0
+            for idx in range(len(df_final)):
+                r_deb = float(df_final.at[idx, 'real_deb'])
+                r_kre = float(df_final.at[idx, 'real_kre'])
+                r_bal = float(df_final.at[idx, OUTPUT_COLUMNS['bal']])
+                baris_num = df_final.at[idx, 'baris_no'] if 'baris_no' in df_final.columns else idx + 1
+                
+                diff = round(r_bal - current_balance, 2)
+                mutasi = r_deb if r_deb > 0 else r_kre
+                
+                if r_bal > 0 and abs(diff) > 0.001:
+                    if diff > 0:
+                        # Saldo bertambah -> PASTI KREDIT
+                        if r_deb > 0 and r_kre == 0:
+                            log_callback(f"Row {baris_num}: Koreksi kolom - Saldo bertambah Rp {diff:,.2f} -> Dipindahkan dari Debet ke Kredit")
+                            r_kre = r_deb
+                            r_deb = 0.0
+                            corrected_count += 1
+                        elif abs(diff - r_kre) > 0.01 and r_kre == 0:
+                            r_kre = diff
+                    elif diff < 0:
+                        # Saldo berkurang -> PASTI DEBET
+                        if r_kre > 0 and r_deb == 0:
+                            log_callback(f"Row {baris_num}: Koreksi kolom - Saldo berkurang Rp {abs(diff):,.2f} -> Dipindahkan dari Kredit ke Debet")
+                            r_deb = r_kre
+                            r_kre = 0.0
+                            corrected_count += 1
+                        elif abs(abs(diff) - r_deb) > 0.01 and r_deb == 0:
+                            r_deb = abs(diff)
+                    current_balance = round(r_bal, 2)
+                else:
+                    if r_kre > 0:
+                        current_balance = round(current_balance + r_kre, 2)
+                    else:
+                        current_balance = round(current_balance - r_deb, 2)
+                
+                df_final.at[idx, 'real_deb'] = r_deb
+                df_final.at[idx, 'real_kre'] = r_kre
+                df_final.at[idx, OUTPUT_COLUMNS['deb']] = r_deb if r_deb > 0 else ""
+                df_final.at[idx, OUTPUT_COLUMNS['kre']] = r_kre if r_kre > 0 else ""
+                df_final.at[idx, OUTPUT_COLUMNS['bal']] = current_balance
+
+            if corrected_count > 0:
+                log_callback(f"[REKONSILIASI KAS] Berhasil membetulkan {corrected_count} transaksi yang tertukar Debet/Kredit agar klop dengan saldo buku kas bank.")
+            else:
+                log_callback("[REKONSILIASI KAS] 100% Seluruh arah transaksi Debet (uang keluar) dan Kredit (uang masuk) cocok sempurna dengan pergerakan saldo.")
+
+            total_kredit = round(df_final['real_kre'].sum(), 2)
+            total_debet = round(df_final['real_deb'].sum(), 2)
             saldo_akhir_val = df_final.iloc[-1][OUTPUT_COLUMNS['bal']]
             
             num_dummy = 7
@@ -291,14 +362,38 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
                 df_dummy = pd.DataFrame(rows)
             log_callback(f"Menambahkan {num_dummy} baris kosong (Dummy Format Accurate).")
             
-            df_dummy = df_dummy.drop(columns=['real_deb', 'real_kre', 'date_obj'], errors='ignore')
-            df_final = df_final.drop(columns=['real_deb', 'real_kre', 'date_obj'])
+            drop_cols = ['real_deb', 'real_kre', 'date_obj', 'baris_no']
+            df_dummy = df_dummy.drop(columns=drop_cols, errors='ignore')
+            df_final = df_final.drop(columns=drop_cols, errors='ignore')
             
             row_saldo_awal = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Awal', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: saldo_awal_val}])
             row_total_mutasi = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Total Mutasi', OUTPUT_COLUMNS['deb']: total_debet, OUTPUT_COLUMNS['kre']: total_kredit, OUTPUT_COLUMNS['bal']: ""}])
             row_saldo_akhir = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Akhir', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: saldo_akhir_val}])
             
+            source_summary = {
+                "label": "Dokumen Excel Panin",
+                "saldo_awal": saldo_awal_val,
+                "debet": raw_source_deb,
+                "kredit": raw_source_kre,
+                "saldo_akhir": saldo_akhir_val,
+                "count": raw_source_count
+            }
+            output_summary = {
+                "label": "Hasil Format Accurate",
+                "saldo_awal": saldo_awal_val,
+                "debet": total_debet,
+                "kredit": total_kredit,
+                "saldo_akhir": saldo_akhir_val,
+                "count": len(df_final)
+            }
+            notes = []
+            if corrected_count > 0:
+                notes.append(f"Tercatat perbaikan pada {corrected_count} baris mutasi yang tertukar posisi Debet/Kredit pada dokumen sumber agar klop dengan rekening koran.")
+            audit_table = format_audit_reconciliation_table("Panin", source_summary, output_summary, notes=notes if notes else None)
+            log_callback("\n" + audit_table)
+
             df_output = pd.concat([df_dummy, row_saldo_awal, df_final, row_total_mutasi, row_saldo_akhir], ignore_index=True)
+            df_output.attrs["audit_table"] = audit_table
 
             log_callback(f"Saldo Awal   : {saldo_awal_val:,.2f}")
             log_callback(f"Total Debit  : {total_debet:,.2f}")
