@@ -264,10 +264,10 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
                 os.remove(f_path)
 
     def test_audit_reconciliation_table_formatter(self):
-        """Test formatting tabel rekonsiliasi kas (Bahasa akuntansi murni, tanpa istilah AI)."""
+        """Pengujian penyusunan tabel lembar rekonsiliasi kas dan mutasi bank."""
         from utils.helpers import format_audit_reconciliation_table
         
-        # Test 1: Sempurna Klop (100% Cocok)
+        # Skenario 1: Rekonsiliasi Klop
         src_metrics = {
             "label": "File Sumber Bank",
             "saldo_awal": 500000.0,
@@ -294,7 +294,6 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
         self.assertIn("Total Transaksi Debet", table_str)
         self.assertIn("Total Transaksi Kredit", table_str)
         self.assertIn("Semua cocok.", table_str)
-        # Pastikan tidak ada istilah ciri khas AI
         self.assertNotIn("ZERO VARIANCE", table_str)
         self.assertNotIn("AUDIT TRAIL", table_str)
 

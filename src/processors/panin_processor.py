@@ -271,8 +271,8 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
         
         raw_source_deb = round(float(df_final['real_deb'].sum()), 2)
         raw_source_kre = round(float(df_final['real_kre'].sum()), 2)
-        raw_source_count_deb = int((df_final['real_deb'] > 0).sum())
-        raw_source_count_kre = int((df_final['real_kre'] > 0).sum())
+        raw_source_count_deb = (df_final['real_deb'] > 0).sum()
+        raw_source_count_kre = (df_final['real_kre'] > 0).sum()
         raw_source_count = len(df_final)
         
         if len(df_final) > 0:
@@ -353,8 +353,8 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
             total_debet = round(df_final['real_deb'].sum(), 2)
             saldo_akhir_val = df_final.iloc[-1][OUTPUT_COLUMNS['bal']]
             
-            out_count_deb = int((df_final['real_deb'] > 0).sum())
-            out_count_kre = int((df_final['real_kre'] > 0).sum())
+            out_count_deb = (df_final['real_deb'] > 0).sum()
+            out_count_kre = (df_final['real_kre'] > 0).sum()
             out_count_total = len(df_final)
 
             num_dummy = 7
