@@ -1,6 +1,6 @@
 {
   "latest_version": "4.5.3",
-  "download_url": "https://www.dropbox.com/scl/fi/jjk5k77hd4cas6g5uyq1a/Accurate_Converter_Setup_v4.5.3.exe?rlkey=7xed9un3fjq73651qm5iu5gmx&st=gioeq5y1&dl=1&ext=.exe",
+  "download_url": "https://www.dropbox.com/scl/fi/jjk5k77hd4cas6g5uyq1a/Accurate_Converter_Setup_v4.5.3.exe?rlkey=7xed9un3fjq73651qm5iu5gmx&st=9vjryd51&dl=1&ext=.exe",
   "release_notes": "Pembaruan v4.5.3:\n- Lembar Rekonsiliasi Kas & Bank: Menampilkan tabel pencocokan mutasi dan saldo kas rekening koran dengan hasil file format Excel (.xls) sebelum di-import ke Accurate Online (khusus Panin dan BCA).\n- Rincian Mutasi Kas: Menyajikan perbandingan saldo awal, mutasi debet (uang keluar), mutasi kredit (uang masuk), saldo akhir, serta rincian jumlah transaksi debet dan kredit secara terpisah.\n- Koreksi Otomatis Posisi Mutasi: Membetulkan otomatis transaksi yang posisinya tertukar antara debet dan kredit pada file sumber sehingga saldo akhir buku kas 100% klop tanpa selisih (Rp 0.00)."
 }
 
