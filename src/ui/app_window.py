@@ -20,7 +20,7 @@ from processors.bca_processor import process_bca
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        version_str = "4.5.2"
+        version_str = "4.5.3"
         try:
             exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             v_path = os.path.join(exe_dir, "version.txt")
@@ -261,6 +261,7 @@ class UniversalAccurateConverter:
                                        border_color=("#E5E9F2", "#2D3748"),
                                        fg_color=("#F8FAFC", "#0F172A"),
                                        text_color=("#334155", "#38BDF8"),  # type: ignore[arg-type]
+                                       wrap="none",
                                        font=ctk.CTkFont(family="Consolas", size=12))
         self.log_area.pack(fill="both", expand=True, padx=35, pady=(5, 25))
         self.log_area.configure(state="disabled")
@@ -314,10 +315,10 @@ class UniversalAccurateConverter:
         dialog = ctk.CTkToplevel(self.root)
         dialog.title(title)
         
-        has_table = "LEMBAR AUDIT REKONSILIASI" in message or "=====" in message
+        has_table = "LEMBAR REKONSILIASI" in message or "LEMBAR AUDIT REKONSILIASI" in message or "=====" in message
         if has_table:
-            dialog.geometry("780x520")
-            font_choice = ctk.CTkFont(family="Consolas", size=11)
+            dialog.geometry("860x580")
+            font_choice = ("Consolas", 11)
         else:
             dialog.geometry("550x280")
             font_choice = ctk.CTkFont(size=13)

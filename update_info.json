@@ -1,7 +1,7 @@
 {
-  "latest_version": "4.5.2",
-  "download_url": "https://www.dropbox.com/scl/fi/gaf5y9klt16s469b6ogt6/Accurate_Converter_Setup_v4.5.2.exe?rlkey=x50d1n81u1lvdg0ru92x4b13t&st=c5v7jqjn&dl=1&ext=.exe",
-  "release_notes": "Pembaruan v4.5.2:\n- Fitur Baru: Validasi Sumber Bank & Anti-Mismatch Guard (mencegah file mutasi BCA diproses di menu Panin, atau sebaliknya).\n- Penolakan Cerdas: Sistem mendeteksi tanda tangan dokumen resmi dan menolak otomatis pemrosesan jika pilihan bank tidak cocok dengan file.\n- Peringatan Dini: Notifikasi langsung saat memilih file jika format terdeteksi berbeda dari menu aktif."
+  "latest_version": "4.5.3",
+  "download_url": "https://www.dropbox.com/scl/fi/gaf5y9klt16s469b6ogt6/Accurate_Converter_Setup_v4.5.3.exe?rlkey=x50d1n81u1lvdg0ru92x4b13t&st=c5v7jqjn&dl=1&ext=.exe",
+  "release_notes": "Pembaruan v4.5.3:\n- Fitur Baru: Lembar Rekonsiliasi Kas & Bank Berdampingan (Side-by-Side) untuk pencocokan mutasi dan saldo kas sebelum ekspor ke Accurate.\n- Rincian Transaksi: Menampilkan total nominal dan frekuensi transaksi Debet (uang keluar), Kredit (uang masuk), serta saldo akhir.\n- Direction Guard: Otomatis membetulkan posisi transaksi yang tertukar Debet/Kredit pada dokumen sumber agar klop dengan saldo rekening koran."
 }
 
 

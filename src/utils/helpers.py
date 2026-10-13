@@ -132,10 +132,15 @@ def parse_date_tolerant(date_str, log_callback=print):
 
 def format_audit_reconciliation_table(bank_name, source_metrics, output_metrics, notes=None):
     """
-    Menghasilkan Lembar Audit Rekonsiliasi Finansial Berdampingan (Side-by-Side):
-    Membandingkan Saldo Awal, Total Debet, Total Kredit, Saldo Akhir, dan Frekuensi Transaksi
-    antara Dokumen Sumber Bank dengan File Hasil Konversi Accurate.
+    Menghasilkan Lembar Rekonsiliasi Mutasi Bank dan Saldo Kas Berdampingan:
+    Membandingkan Saldo Awal, Total Debet, Total Kredit, Saldo Akhir, serta
+    Rincian Jumlah Transaksi Debet, Kredit, dan Total Mutasi.
     """
+    COL1_W = 26
+    COL2_W = 24
+    COL3_W = 24
+    COL4_W = 18
+
     sa_src = source_metrics.get("saldo_awal")
     sa_out = output_metrics.get("saldo_awal", 0.0)
     deb_src = source_metrics.get("debet", 0.0)
@@ -144,62 +149,91 @@ def format_audit_reconciliation_table(bank_name, source_metrics, output_metrics,
     kre_out = output_metrics.get("kredit", 0.0)
     sk_src = source_metrics.get("saldo_akhir")
     sk_out = output_metrics.get("saldo_akhir", 0.0)
-    cnt_src = source_metrics.get("count", 0)
-    cnt_out = output_metrics.get("count", 0)
-    
+
+    cnt_deb_src = source_metrics.get("count_deb", 0)
+    cnt_deb_out = output_metrics.get("count_deb", 0)
+    cnt_kre_src = source_metrics.get("count_kre", 0)
+    cnt_kre_out = output_metrics.get("count_kre", 0)
+    cnt_tot_src = source_metrics.get("count", cnt_deb_src + cnt_kre_src)
+    cnt_tot_out = output_metrics.get("count", cnt_deb_out + cnt_kre_out)
+
     src_label = source_metrics.get("label", "Dokumen Sumber Bank")
     out_label = output_metrics.get("label", "Hasil Accurate")
-    
-    # Delta calculations
+
+    # Perhitungan selisih pembukuan
     diff_deb = round(abs(deb_out - deb_src), 2)
     diff_kre = round(abs(kre_out - kre_src), 2)
     diff_sa = round(abs(sa_out - sa_src), 2) if sa_src is not None else 0.0
     diff_sk = round(abs(sk_out - sk_src), 2) if sk_src is not None else 0.0
-    diff_cnt = abs(cnt_out - cnt_src)
-    
-    status_deb = "[100% MATCH] (KLOP)" if diff_deb < 0.01 else f"[SELISIH: Rp {diff_deb:,.2f}]"
-    status_kre = "[100% MATCH] (KLOP)" if diff_kre < 0.01 else f"[SELISIH: Rp {diff_kre:,.2f}]"
-    status_sa = "[100% MATCH] (KLOP)" if (sa_src is None or diff_sa < 0.01) else f"[SELISIH: Rp {diff_sa:,.2f}]"
-    status_sk = "[100% MATCH] (KLOP)" if (sk_src is None or diff_sk < 0.01) else f"[SELISIH: Rp {diff_sk:,.2f}]"
-    status_cnt = "[100% MATCH] (KLOP)" if diff_cnt == 0 else f"[SELISIH: {diff_cnt} BARIS]"
-    
-    sa_src_str = f"Rp {sa_src:>14,.2f}" if sa_src is not None else "  (Dihitung Mundur)"
-    sk_src_str = f"Rp {sk_src:>14,.2f}" if sk_src is not None else f"Rp {sk_out:>14,.2f}"
-    
-    line_w = 88
+    diff_cnt_deb = abs(cnt_deb_out - cnt_deb_src)
+    diff_cnt_kre = abs(cnt_kre_out - cnt_kre_src)
+    diff_cnt_tot = abs(cnt_tot_out - cnt_tot_src)
+
+    status_sa = "[COCOK / KLOP]" if (sa_src is None or diff_sa < 0.01) else f"[SELISIH: Rp {diff_sa:,.2f}]"
+    status_deb = "[COCOK / KLOP]" if diff_deb < 0.01 else f"[SELISIH: Rp {diff_deb:,.2f}]"
+    status_kre = "[COCOK / KLOP]" if diff_kre < 0.01 else f"[SELISIH: Rp {diff_kre:,.2f}]"
+    status_sk = "[COCOK / KLOP]" if (sk_src is None or diff_sk < 0.01) else f"[SELISIH: Rp {diff_sk:,.2f}]"
+    status_cnt_deb = "[COCOK / KLOP]" if diff_cnt_deb == 0 else f"[SELISIH: {diff_cnt_deb} BARIS]"
+    status_cnt_kre = "[COCOK / KLOP]" if diff_cnt_kre == 0 else f"[SELISIH: {diff_cnt_kre} BARIS]"
+    status_cnt_tot = "[COCOK / KLOP]" if diff_cnt_tot == 0 else f"[SELISIH: {diff_cnt_tot} BARIS]"
+
+    def c_curr(v):
+        return f"Rp {v:>15,.2f}" if v is not None else "(Dihitung Mundur)"
+
+    def c_cnt(n):
+        return f"{n:>6} transaksi"
+
+    def row(name, val2, val3, stat, is_header=False):
+        c1 = f" {name:<{COL1_W-1}}"
+        if is_header:
+            c2 = f" {val2:^{COL2_W-2}} "
+            c3 = f" {val3:^{COL3_W-2}} "
+        else:
+            c2 = f" {val2:>{COL2_W-2}} "
+            c3 = f" {val3:>{COL3_W-2}} "
+        c4 = f" {stat:<{COL4_W-1}}"
+        return f"{c1}|{c2}|{c3}|{c4}"
+
+    header_row = row("Pos Rekening / Mutasi", src_label, out_label, "Status Rekonsiliasi", is_header=True)
+    line_w = len(header_row)
     border = "=" * line_w
     sep = "-" * line_w
-    
+
+    title = f"LEMBAR REKONSILIASI MUTASI BANK DAN SALDO KAS ({bank_name.upper()})"
     lines = [
         border,
-        f"        LEMBAR AUDIT REKONSILIASI MUTASI BANK & SALDO KAS ({bank_name.upper()})",
+        f"{title:^{line_w}}",
         border,
-        f" Rincian Rekening       | {src_label[:22]:<22} | {out_label[:22]:<22} | Status Rekonsiliasi",
+        header_row,
         sep,
-        f" 1. Saldo Awal Kas      | {sa_src_str:<22} | Rp {sa_out:>14,.2f}   | {status_sa}",
-        f" 2. Mutasi Uang Keluar  | Rp {deb_src:>14,.2f}   | Rp {deb_out:>14,.2f}   | {status_deb}",
-        f"    (Total Debet)       |                        |                        |",
-        f" 3. Mutasi Uang Masuk   | Rp {kre_src:>14,.2f}   | Rp {kre_out:>14,.2f}   | {status_kre}",
-        f"    (Total Kredit)      |                        |                        |",
-        f" 4. Saldo Akhir Kas     | {sk_src_str:<22} | Rp {sk_out:>14,.2f}   | {status_sk}",
-        f" 5. Jumlah Baris Mutasi | {cnt_src:>5} transaksi        | {cnt_out:>5} transaksi        | {status_cnt}",
+        row("1. Saldo Awal Kas", c_curr(sa_src), c_curr(sa_out), status_sa),
+        row("2. Mutasi Debet (Keluar)", c_curr(deb_src), c_curr(deb_out), status_deb),
+        row("3. Mutasi Kredit (Masuk)", c_curr(kre_src), c_curr(kre_out), status_kre),
+        row("4. Saldo Akhir Kas", c_curr(sk_src), c_curr(sk_out), status_sk),
         sep,
-        f" PERSAMAAN SALDO KAS    : Saldo Awal ({sa_out:,.2f}) + Uang Masuk/Kredit ({kre_out:,.2f})",
-        f"                        - Uang Keluar/Debet ({deb_out:,.2f}) = Saldo Akhir ({sk_out:,.2f})",
+        row("5. Total Transaksi Debet", c_cnt(cnt_deb_src), c_cnt(cnt_deb_out), status_cnt_deb),
+        row("6. Total Transaksi Kredit", c_cnt(cnt_kre_src), c_cnt(cnt_kre_out), status_cnt_kre),
+        row("7. Total Semua Mutasi", c_cnt(cnt_tot_src), c_cnt(cnt_tot_out), status_cnt_tot),
+        sep,
+        f" PERSAMAAN SALDO KAS      : Saldo Awal ({sa_out:,.2f}) + Total Kredit ({kre_out:,.2f})",
+        f"                          - Total Debet ({deb_out:,.2f}) = Saldo Akhir ({sk_out:,.2f})",
     ]
-    
-    all_matched = (diff_deb < 0.01 and diff_kre < 0.01 and diff_sa < 0.01 and diff_sk < 0.01 and diff_cnt == 0)
+
+    all_matched = (
+        diff_deb < 0.01 and diff_kre < 0.01 and diff_sa < 0.01 and diff_sk < 0.01
+        and diff_cnt_deb == 0 and diff_cnt_kre == 0 and diff_cnt_tot == 0
+    )
     if all_matched:
-        lines.append(" STATUS REKONSILIASI    : [KLOP 100% PERSIS - TIDAK ADA SELISIH (SELISIH Rp 0.00 / ZERO VARIANCE)]")
+        lines.append(" STATUS KESELURUHAN       : [SEMUA MUTASI DAN SALDO 100% KLOP - TIDAK ADA SELISIH (Rp 0.00)]")
     else:
-        lines.append(" STATUS REKONSILIASI    : [TERDAPAT PENYESUAIAN AUDIT - PERIKSA CATATAN DI BAWAH]")
-        
+        lines.append(" STATUS KESELURUHAN       : [TERDAPAT PENYESUAIAN MUTASI - SILAKAN PERIKSA CATATAN DI BAWAH]")
+
     if notes:
         lines.append(sep)
-        lines.append(" CATATAN PENYESUAIAN MUTASI (AUDIT TRAIL):")
+        lines.append(" CATATAN PENYESUAIAN MUTASI:")
         note_list = [notes] if isinstance(notes, str) else notes
         for note in note_list:
             lines.append(f" * {note}")
-            
+
     lines.append(border)
     return "\n".join(lines)

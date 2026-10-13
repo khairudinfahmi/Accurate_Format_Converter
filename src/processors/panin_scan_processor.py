@@ -475,13 +475,19 @@ def process_panin_scanned_pdf(filepath, log_callback, progress_callback, success
         row_total_mutasi = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Total Mutasi', OUTPUT_COLUMNS['deb']: total_debet, OUTPUT_COLUMNS['kre']: total_kredit, OUTPUT_COLUMNS['bal']: ""}])
         row_saldo_akhir = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Akhir', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: saldo_akhir_val}])
 
+        count_deb = sum(1 for tx in final_data if tx.get(OUTPUT_COLUMNS['deb']) not in ("", 0, 0.0, None))
+        count_kre = sum(1 for tx in final_data if tx.get(OUTPUT_COLUMNS['kre']) not in ("", 0, 0.0, None))
+        count_total = len(final_data)
+
         source_summary = {
             "label": "Dokumen PDF Scan Panin",
             "saldo_awal": saldo_awal_val,
             "debet": total_debet,
             "kredit": total_kredit,
             "saldo_akhir": saldo_akhir_val,
-            "count": len(final_data)
+            "count_deb": count_deb,
+            "count_kre": count_kre,
+            "count": count_total
         }
         output_summary = {
             "label": "Hasil Format Accurate",
@@ -489,7 +495,9 @@ def process_panin_scanned_pdf(filepath, log_callback, progress_callback, success
             "debet": total_debet,
             "kredit": total_kredit,
             "saldo_akhir": saldo_akhir_val,
-            "count": len(final_data)
+            "count_deb": count_deb,
+            "count_kre": count_kre,
+            "count": count_total
         }
         notes = ["Pencocokan saldo berjenjang dari baris awal sampai akhir 100% klop (selisih Rp 0.00)."]
         audit_table = format_audit_reconciliation_table("Panin Scan", source_summary, output_summary, notes=notes)

@@ -257,23 +257,25 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
             self.assertEqual(float(row_sa[OUTPUT_COLUMNS['bal']]), 0.0)
             # Verifikasi audit_table disematkan ke df.attrs
             self.assertIn("audit_table", df.attrs)
-            self.assertIn("LEMBAR AUDIT REKONSILIASI", df.attrs["audit_table"])
-            self.assertIn("TERDAPAT PENYESUAIAN AUDIT", df.attrs["audit_table"])
+            self.assertIn("LEMBAR REKONSILIASI MUTASI BANK DAN SALDO KAS", df.attrs["audit_table"])
+            self.assertIn("TERDAPAT PENYESUAIAN MUTASI", df.attrs["audit_table"])
         finally:
             if os.path.exists(f_path):
                 os.remove(f_path)
 
     def test_audit_reconciliation_table_formatter(self):
-        """Test formatting tabel audit rekonsiliasi finansial (100% MATCH dan penanganan delta)."""
+        """Test formatting tabel rekonsiliasi kas (Bahasa akuntansi murni, tanpa istilah AI)."""
         from utils.helpers import format_audit_reconciliation_table
         
-        # Test 1: Sempurna 100% Match
+        # Test 1: Sempurna Klop (100% Cocok)
         src_metrics = {
             "label": "File Sumber Bank",
             "saldo_awal": 500000.0,
             "debet": 250000.0,
             "kredit": 750000.0,
             "saldo_akhir": 1000000.0,
+            "count_deb": 4,
+            "count_kre": 6,
             "count": 10
         }
         out_metrics = {
@@ -282,12 +284,19 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
             "debet": 250000.0,
             "kredit": 750000.0,
             "saldo_akhir": 1000000.0,
+            "count_deb": 4,
+            "count_kre": 6,
             "count": 10
         }
         table_str = format_audit_reconciliation_table("BCA", src_metrics, out_metrics, notes="Semua cocok.")
-        self.assertIn("[100% MATCH]", table_str)
-        self.assertIn("ZERO VARIANCE", table_str)
+        self.assertIn("[COCOK / KLOP]", table_str)
+        self.assertIn("SEMUA MUTASI DAN SALDO 100% KLOP", table_str)
+        self.assertIn("Total Transaksi Debet", table_str)
+        self.assertIn("Total Transaksi Kredit", table_str)
         self.assertIn("Semua cocok.", table_str)
+        # Pastikan tidak ada istilah ciri khas AI
+        self.assertNotIn("ZERO VARIANCE", table_str)
+        self.assertNotIn("AUDIT TRAIL", table_str)
 
         # Test 2: Catatan list
         table_with_list = format_audit_reconciliation_table("Panin", src_metrics, out_metrics, notes=["Koreksi 1", "Koreksi 2"])
@@ -298,7 +307,7 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
         src_diff = dict(src_metrics, debet=200000.0)
         table_diff = format_audit_reconciliation_table("BCA", src_diff, out_metrics)
         self.assertIn("SELISIH: Rp 50,000.00", table_diff)
-        self.assertIn("TERDAPAT PENYESUAIAN AUDIT", table_diff)
+        self.assertIn("TERDAPAT PENYESUAIAN MUTASI", table_diff)
 
 if __name__ == '__main__':
     unittest.main()

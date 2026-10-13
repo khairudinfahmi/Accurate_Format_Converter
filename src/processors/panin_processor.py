@@ -271,6 +271,8 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
         
         raw_source_deb = round(float(df_final['real_deb'].sum()), 2)
         raw_source_kre = round(float(df_final['real_kre'].sum()), 2)
+        raw_source_count_deb = int((df_final['real_deb'] > 0).sum())
+        raw_source_count_kre = int((df_final['real_kre'] > 0).sum())
         raw_source_count = len(df_final)
         
         if len(df_final) > 0:
@@ -351,6 +353,10 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
             total_debet = round(df_final['real_deb'].sum(), 2)
             saldo_akhir_val = df_final.iloc[-1][OUTPUT_COLUMNS['bal']]
             
+            out_count_deb = int((df_final['real_deb'] > 0).sum())
+            out_count_kre = int((df_final['real_kre'] > 0).sum())
+            out_count_total = len(df_final)
+
             num_dummy = 7
             # Loop ulang data transaksi sampai genap 7 baris
             if len(df_final) >= num_dummy:
@@ -369,13 +375,15 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
             row_saldo_awal = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Awal', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: saldo_awal_val}])
             row_total_mutasi = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Total Mutasi', OUTPUT_COLUMNS['deb']: total_debet, OUTPUT_COLUMNS['kre']: total_kredit, OUTPUT_COLUMNS['bal']: ""}])
             row_saldo_akhir = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Akhir', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: saldo_akhir_val}])
-            
+
             source_summary = {
                 "label": "Dokumen Excel Panin",
                 "saldo_awal": saldo_awal_val,
                 "debet": raw_source_deb,
                 "kredit": raw_source_kre,
                 "saldo_akhir": saldo_akhir_val,
+                "count_deb": raw_source_count_deb,
+                "count_kre": raw_source_count_kre,
                 "count": raw_source_count
             }
             output_summary = {
@@ -384,7 +392,9 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
                 "debet": total_debet,
                 "kredit": total_kredit,
                 "saldo_akhir": saldo_akhir_val,
-                "count": len(df_final)
+                "count_deb": out_count_deb,
+                "count_kre": out_count_kre,
+                "count": out_count_total
             }
             notes = []
             if corrected_count > 0:

@@ -212,6 +212,9 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
         
         progress_callback(0.9)
         
+        out_count_deb = sum(1 for tx in transactions if tx["tipe"] == "DB")
+        out_count_kre = sum(1 for tx in transactions if tx["tipe"] == "CR")
+
         from utils.helpers import format_audit_reconciliation_table
         source_summary = {
             "label": "Ringkasan CSV BCA",
@@ -219,6 +222,8 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
             "debet": mutasi_debet_summary if mutasi_debet_summary is not None else total_debet,
             "kredit": mutasi_kredit_summary if mutasi_kredit_summary is not None else total_kredit,
             "saldo_akhir": saldo_akhir if saldo_akhir > 0 else current_balance,
+            "count_deb": out_count_deb,
+            "count_kre": out_count_kre,
             "count": valid_count
         }
         output_summary = {
@@ -227,6 +232,8 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
             "debet": total_debet,
             "kredit": total_kredit,
             "saldo_akhir": current_balance,
+            "count_deb": out_count_deb,
+            "count_kre": out_count_kre,
             "count": valid_count
         }
         audit_table = format_audit_reconciliation_table("BCA CSV", source_summary, output_summary)
@@ -421,6 +428,9 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
         log_callback(f"Total Mutasi Kredit: {total_kredit:,.2f}")
         log_callback(f"Saldo Akhir: {current_balance:,.2f}")
         
+        out_count_deb = sum(1 for tx in transactions if tx["tipe"] == "DB")
+        out_count_kre = sum(1 for tx in transactions if tx["tipe"] == "CR")
+
         # Validasi Rekonsiliasi Otomatis terhadap Ringkasan Bank
         from utils.helpers import format_audit_reconciliation_table
         source_summary = {
@@ -429,6 +439,8 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
             "debet": mutasi_debit_summary if mutasi_debit_summary is not None else total_debet,
             "kredit": mutasi_kredit_summary if mutasi_kredit_summary is not None else total_kredit,
             "saldo_akhir": saldo_akhir if saldo_akhir is not None else current_balance,
+            "count_deb": out_count_deb,
+            "count_kre": out_count_kre,
             "count": valid_count
         }
         output_summary = {
@@ -437,6 +449,8 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
             "debet": total_debet,
             "kredit": total_kredit,
             "saldo_akhir": current_balance,
+            "count_deb": out_count_deb,
+            "count_kre": out_count_kre,
             "count": valid_count
         }
         audit_table = format_audit_reconciliation_table("BCA Giro", source_summary, output_summary)
@@ -624,6 +638,9 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
         m_sa = re.search(r'SALDO\s*AKHIR\s*:?\s*([\d\.,]+)', full_text, re.IGNORECASE)
         saldo_akhir_sum = clean_currency(m_sa.group(1)) if m_sa else None
 
+        out_count_deb = sum(1 for tx in transactions if tx["tipe"] == "DB")
+        out_count_kre = sum(1 for tx in transactions if tx["tipe"] == "CR")
+
         from utils.helpers import format_audit_reconciliation_table
         source_summary = {
             "label": "Ringkasan BCA Tahapan",
@@ -631,6 +648,8 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
             "debet": mutasi_db_sum if mutasi_db_sum is not None else total_debet,
             "kredit": mutasi_cr_sum if mutasi_cr_sum is not None else total_kredit,
             "saldo_akhir": saldo_akhir_sum if saldo_akhir_sum is not None else current_balance,
+            "count_deb": out_count_deb,
+            "count_kre": out_count_kre,
             "count": valid_count
         }
         output_summary = {
@@ -639,6 +658,8 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
             "debet": total_debet,
             "kredit": total_kredit,
             "saldo_akhir": current_balance,
+            "count_deb": out_count_deb,
+            "count_kre": out_count_kre,
             "count": valid_count
         }
         audit_table = format_audit_reconciliation_table("BCA Tahapan", source_summary, output_summary)
