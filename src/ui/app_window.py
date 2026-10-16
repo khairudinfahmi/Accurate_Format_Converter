@@ -627,6 +627,17 @@ class UniversalAccurateConverter:
                 def format_bca_ddmmyyyy(raw_date, year_fallback):
                     d = str(raw_date).replace("'", "").strip()
                     if not d: return ""
+                    if "PEND" in d.upper():
+                        for prev_tx in reversed(transactions):
+                            pt = str(prev_tx.get("tanggal", "")).replace("'", "").strip()
+                            if pt and "PEND" not in pt.upper():
+                                p_parts = pt.split('/')
+                                if len(p_parts) == 2:
+                                    return f"{int(p_parts[0]):02d}/{int(p_parts[1]):02d}/{year_fallback}"
+                                elif len(p_parts) >= 3:
+                                    return f"{int(p_parts[0]):02d}/{int(p_parts[1]):02d}/{p_parts[2]}"
+                        now = datetime.datetime.now()
+                        return f"{now.day:02d}/{now.month:02d}/{year_fallback}"
                     p = d.split('/')
                     if len(p) == 2:
                         return f"{p[0]:0>2}/{p[1]:0>2}/{year_fallback}"

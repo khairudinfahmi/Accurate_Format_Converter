@@ -94,8 +94,12 @@ def save_aol_json(filepath, account_number, opening_balance, closing_balance, mu
         }
 
         for item in mutation_list:
+            t_date = str(item.get("transDate", "")).strip()
+            if "PEND" in t_date.upper() or not t_date:
+                import datetime
+                t_date = datetime.datetime.now().strftime("%d/%m/%Y")
             payload["mutationList"].append({
-                "transDate": str(item.get("transDate", "")).strip(),
+                "transDate": t_date,
                 "description": str(item.get("description", "")).strip(),
                 "amount": round(float(item.get("amount", 0.0)), 2),
                 "balance": round(float(item.get("balance", 0.0)), 2)

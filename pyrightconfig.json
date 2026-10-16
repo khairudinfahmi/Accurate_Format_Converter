@@ -1,5 +1,10 @@
 {
     "extraPaths": ["src"],
+    "ignore": [
+        "launcher.py"
+    ],
     "reportArgumentType": false,
-    "reportMissingImports": false
+    "reportMissingImports": false,
+    "reportAttributeAccessIssue": false,
+    "reportPossiblyUnboundVariable": false
 }

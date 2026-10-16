@@ -5,6 +5,135 @@ import itertools
 import pdfplumber
 from utils.helpers import clean_currency
 
+def clean_bca_description(desc):
+    """
+    Standarisasi dan pembersihan teks keterangan mutasi BCA:
+    - Menambahkan pemisah standar ' - ' pada TRSF E-BANKING (CR/DB), SETORAN VIA CDM, BI-FAST, KR OTOMATIS, KARTU KREDIT.
+    - Memisahkan teks dan angka yang menempel akibat fixed-width field raw KlikBCA
+      (misal nominal menempel dengan nama, kode terminal WS menempel dengan nomor VA/rekening, MID menempel nama merchant, dll).
+    - Menghilangkan redundansi tanggal pada QRIS KR OTOMATIS.
+    - Menormalkan padding spasi berlebih (-                 - menjadi - -).
+    """
+    if not desc:
+        return ""
+    s = str(desc).strip()
+    
+    # 1. Standarisasi Prefix transaksi BCA dengan tanda pemisah ' - '
+    s = re.sub(r'^(TRSF\s+E-BANKING\s+(?:CR|DB))(?!\s*-)\s*', r'\1 - ', s)
+    s = re.sub(r'^(SETORAN\s+VIA\s+CDM)(?!\s*-)\s*', r'\1 - ', s)
+    s = re.sub(r'^(BI-FAST\s+(?:CR|DB))(?!\s*-)\s*TRANSFER\b', r'\1 - BIF TRANSFER', s)
+    s = re.sub(r'^(BI-FAST\s+(?:CR|DB))(?!\s*-)\s*BIAYA\s+TXN\b', r'\1 - BIF BIAYA TXN', s)
+    s = re.sub(r'^(BI-FAST\s+(?:CR|DB))(?!\s*-)\s*BIF\b', r'\1 - BIF', s)
+    
+    # 2. QRIS (KR OTOMATIS) & KARTU KREDIT (EDC)
+    s = re.sub(r'^KR\s+OTOMATIS\s+TANGGAL\s*:\s*\d{2}/\d{2}\s+', r'KR OTOMATIS - ', s)
+    s = re.sub(r'^KR\s+OTOMATIS(?!\s*-)\s+MID', r'KR OTOMATIS - MID', s)
+    s = re.sub(r'^KARTU\s+KREDIT(?!\s*-)\s+MID', r'KARTU KREDIT - MID', s)
+    
+    # 3. Pisahkan kode terminal WSID / WS yang menempel dengan kode VA / nomor
+    s = re.sub(r'(WS\d{5})(\d{4,}/)', r'\1 \2', s)
+    s = re.sub(r'(WS\d{5})([A-Z]{3,}\d+)', r'\1 \2', s)
+    
+    # 4. Pisahkan angka/kata yang menempel akibat fixed-width field KlikBCA
+    s = re.sub(r'(MID\s*:\s*\d+)([A-Za-z])', r'\1 \2', s)
+    s = re.sub(r'([A-Za-z0-9])(QR\s*:)', r'\1 \2', s)
+    s = re.sub(r'([A-Za-z0-9])(TGH\s*:)', r'\1 \2', s)
+    s = re.sub(r'(\d+\.\d{2})(ADM\s*:)', r'\1 \2', s)
+    s = re.sub(r'(\d+\.\d{2})(DDR\s*:)', r'\1 \2', s)
+    s = re.sub(r'(\d+\.\d{2})([A-Za-z])', r'\1 \2', s)
+    s = re.sub(r'(Transfe)(ID\d+)', r'\1 \2', s)
+    s = re.sub(r'([A-Z0-9]{3,})(DOMPET\b)', r'\1 \2', s)
+    
+    # 5. Normalisasi padding spasi berlebih antar tanda hubung
+    s = re.sub(r'-\s{2,}-', r'- -', s)
+    
+    # 6. Kompres spasi padding berlebih (lebih dari 3 spasi menjadi 3 spasi indent)
+    s = re.sub(r'[ \t]{4,}', r'   ', s)
+    
+    return s.strip()
+
+def resolve_pend_date(transactions, effective_year=None, metadata_period="", filename=""):
+    """
+    Menyelesaikan tanggal transaksi berstatus 'PEND' (Pending settlement BCA):
+    Accurate Online (AOL) mewajibkan transDate bertipe DD/MM/YYYY dan menolak string 'PEND'.
+    Fungsi ini mencari tanggal riil hari transaksi:
+    1. Deteksi tahun efektif jika belum tersedia
+    2. Scan kode transaksi dalam mutasi PEND (misal 1510/FTSCY -> 15/10/YYYY, TANGGAL :15/10)
+    3. Cek metadata periode atau nama file (misal 15Okt2026, 151026)
+    4. Fallback ke tanggal transaksi non-PEND tertinggi/terakhir di berkas
+    5. Fallback ke tanggal hari ini
+    Mengembalikan format 'DD/MM/YYYY'.
+    """
+    import datetime
+    now = datetime.datetime.now()
+    
+    eff_year = str(effective_year) if effective_year else ""
+    if not eff_year:
+        y_m = re.search(r'\b(20\d{2}|19\d{2})\b', metadata_period)
+        if y_m:
+            eff_year = y_m.group(1)
+        else:
+            y_fn = re.search(r'\b(20\d{2}|19\d{2})\b', filename)
+            if y_fn:
+                eff_year = y_fn.group(1)
+            else:
+                for tx in transactions:
+                    t_val = str(tx.get("tanggal", "")).replace("'", "").strip()
+                    m_y = re.search(r'/(\d{4})$', t_val)
+                    if m_y:
+                        eff_year = m_y.group(1)
+                        break
+    if not eff_year:
+        eff_year = str(now.year)
+        
+    candidate_dates = []
+    
+    # 1. Cek dari transaksi PEND (kode transfer seperti 1510/FTSCY atau TANGGAL :15/10)
+    for tx in transactions:
+        t_raw = str(tx.get("tanggal", "")).replace("'", "").strip().upper()
+        if "PEND" in t_raw:
+            desc = str(tx.get("keterangan", ""))
+            m_code = re.search(r'\b(\d{2})(\d{2})/(?:FTSCY|FTFVA|PYBCA|WS\d+)', desc)
+            if m_code:
+                day, month = int(m_code.group(1)), int(m_code.group(2))
+                if 1 <= day <= 31 and 1 <= month <= 12:
+                    candidate_dates.append(f"{day:02d}/{month:02d}/{eff_year}")
+            m_tgl = re.search(r'TANGGAL\s*:?\s*(\d{2})/(\d{2})', desc)
+            if m_tgl:
+                day, month = int(m_tgl.group(1)), int(m_tgl.group(2))
+                if 1 <= day <= 31 and 1 <= month <= 12:
+                    candidate_dates.append(f"{day:02d}/{month:02d}/{eff_year}")
+
+    # 2. Cek dari nama file atau metadata period (misal 15Okt2026 atau 151026)
+    search_str = f"{filename} {metadata_period}"
+    m_fn = re.search(r'(\d{1,2})\s*(Jan|Feb|Mar|Apr|Mei|Jun|Jul|Agu|Ags|Sep|Okt|Nov|Des)[a-z]*\s*(\d{4})?', search_str, re.IGNORECASE)
+    if m_fn:
+        m_map = {'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'mei': 5, 'jun': 6, 'jul': 7, 'agu': 8, 'ags': 8, 'sep': 9, 'okt': 10, 'nov': 11, 'des': 12}
+        d = int(m_fn.group(1))
+        m = m_map.get(m_fn.group(2).lower()[:3], now.month)
+        y = m_fn.group(3) or eff_year
+        candidate_dates.append(f"{d:02d}/{m:02d}/{y}")
+
+    # 3. Kumpulkan tanggal-tanggal valid non-PEND dari dokumen
+    valid_dates = []
+    for tx in transactions:
+        t_raw = str(tx.get("tanggal", "")).replace("'", "").strip()
+        if t_raw and "PEND" not in t_raw.upper():
+            p = t_raw.split('/')
+            if len(p) == 2:
+                valid_dates.append(f"{int(p[0]):02d}/{int(p[1]):02d}/{eff_year}")
+            elif len(p) >= 3:
+                valid_dates.append(f"{int(p[0]):02d}/{int(p[1]):02d}/{p[2]}")
+
+    if candidate_dates:
+        candidate_dates.sort(key=lambda s: (int(s.split('/')[1]), int(s.split('/')[0])))
+        return candidate_dates[-1]
+    elif valid_dates:
+        valid_dates.sort(key=lambda s: (int(s.split('/')[2]), int(s.split('/')[1]), int(s.split('/')[0])))
+        return valid_dates[-1]
+    else:
+        return f"{now.day:02d}/{now.month:02d}/{eff_year}"
+
 def _reconcile_bca_transactions(transactions, saldo_awal, log_callback):
     """
     Rekonsiliasi matematis saldo berjenjang dengan Look-Ahead Cluster Solver:
@@ -239,7 +368,7 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
 
                 transactions.append({
                     "tanggal": "'" + tgl_clean,
-                    "keterangan": desc,
+                    "keterangan": clean_bca_description(desc),
                     "cabang": "'" + (cab_clean if cab_clean else "0000"),
                     "mutasi": mutasi_val,
                     "tipe": tipe_val,
@@ -249,6 +378,15 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
 
         if not transactions:
             raise Exception("File CSV berhasil dibaca, namun tidak ditemukan data transaksi BCA.")
+
+        # Selesaikan tanggal transaksi PEND (jika ada) ke format DD/MM/YYYY
+        pend_found = any("PEND" in str(tx.get("tanggal", "")).upper() for tx in transactions)
+        if pend_found:
+            resolved_pend = resolve_pend_date(transactions, effective_year=None, metadata_period=periode_raw, filename=basename)
+            log_callback(f"[INFO] Tanggal transaksi PEND diselesaikan menjadi tanggal valid: {resolved_pend}")
+            for tx in transactions:
+                if "PEND" in str(tx.get("tanggal", "")).upper():
+                    tx["tanggal"] = "'" + resolved_pend
 
         # Hitung Saldo Awal jika tidak ada di header
         if saldo_awal is None:
@@ -384,7 +522,7 @@ def _process_bca_excel(filepath, log_callback, progress_callback, success_callba
 
             transactions.append({
                 "tanggal": "'" + tgl_clean,
-                "keterangan": desc,
+                "keterangan": clean_bca_description(desc),
                 "cabang": "'" + (cab_clean if cab_clean else "0000"),
                 "mutasi": mutasi_val,
                 "tipe": tipe_val,
@@ -394,6 +532,15 @@ def _process_bca_excel(filepath, log_callback, progress_callback, success_callba
 
         if not transactions:
             raise Exception("File Excel berhasil dibaca, namun tidak ditemukan baris transaksi BCA.")
+
+        # Selesaikan tanggal transaksi PEND (jika ada) ke format DD/MM/YYYY
+        pend_found = any("PEND" in str(tx.get("tanggal", "")).upper() for tx in transactions)
+        if pend_found:
+            resolved_pend = resolve_pend_date(transactions, effective_year=None, metadata_period="", filename=os.path.basename(filepath))
+            log_callback(f"[INFO] Tanggal transaksi PEND diselesaikan menjadi tanggal valid: {resolved_pend}")
+            for tx in transactions:
+                if "PEND" in str(tx.get("tanggal", "")).upper():
+                    tx["tanggal"] = "'" + resolved_pend
 
         # Hitung Saldo Awal backward dari baris pertama jika tidak ada di header
         if saldo_awal is None:
@@ -595,7 +742,7 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
                 
             transactions.append({
                 "tanggal": "'" + date,
-                "keterangan": desc,
+                "keterangan": clean_bca_description(desc),
                 "cabang": "'" + cabang,
                 "mutasi": mutasi,
                 "tipe": tipe,
@@ -817,7 +964,7 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
                 
             transactions.append({
                 "tanggal": "'" + date,
-                "keterangan": desc,
+                "keterangan": clean_bca_description(desc),
                 "cabang": "'0000",
                 "mutasi": mutasi,
                 "tipe": tipe,

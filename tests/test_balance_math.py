@@ -480,6 +480,113 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
                     if os.path.exists(temp_json):
                         os.remove(temp_json)
 
+    def test_pend_date_resolution_and_clean_desc(self):
+        """Verifikasi bahwa file TRIA CSV dengan status 'PEND' otomatis diselesaikan menjadi tanggal valid 15/10/2026 dan deskripsi dibersihkan"""
+        from processors.bca_processor import process_bca
+        from utils.file_exporter import save_aol_json
+        import re
+        import json
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        tria_file = os.path.join(repo_root, "filemutasiaslibankasli", "TRIAAGUS9103_1831201137.CSV")
+        if not os.path.exists(tria_file):
+            self.skipTest("Berkas TRIAAGUS9103_1831201137.CSV tidak ditemukan")
+
+        results = []
+        errors = []
+        process_bca(
+            tria_file,
+            log_callback=lambda m: None,
+            progress_callback=lambda p: None,
+            success_callback=lambda txs, rek, nm, sa, sak, fp: results.append((txs, rek, nm, sa, sak)),
+            error_callback=lambda e: errors.append(e)
+        )
+
+        self.assertEqual(len(errors), 0, f"Error saat process_bca: {errors}")
+        self.assertEqual(len(results), 1)
+        txs, rek, nm, sa, sak = results[0]
+
+        # 1. Pastikan saldo awal & akhir sesuai dokumen
+        self.assertEqual(sa, 153631583.66)
+        self.assertEqual(sak, 77536075.46)
+        self.assertEqual(len(txs), 74)
+
+        # 2. Pastikan tidak ada transaksi yang berstatus PEND
+        pend_count = sum(1 for t in txs if "PEND" in str(t["tanggal"]).upper())
+        self.assertEqual(pend_count, 0, "Ditemukan transaksi dengan tanggal 'PEND'")
+
+        # 3. Pastikan 5 transaksi paling bawah diselesaikan ke 15/10/2026
+        for t in txs[-5:]:
+            tgl = str(t["tanggal"]).replace("'", "").strip()
+            self.assertEqual(tgl, "15/10/2026")
+
+        # 4. Pastikan deskripsi dibersihkan (ada ' - ', 'BIF TRANSFER', pemisah nominal/teks)
+        self.assertTrue(any("BI-FAST CR - BIF TRANSFER" in t["keterangan"] for t in txs))
+        self.assertTrue(any("TRSF E-BANKING CR - " in t["keterangan"] for t in txs))
+        self.assertTrue(any("310000.00 MELLISA" in t["keterangan"] for t in txs))
+
+        # 5. Pastikan ekspor JSON tidak mengandung PEND dan seluruh transDate valid
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as tf:
+            tria_json = tf.name
+
+        try:
+            mutations = []
+            for t in txs:
+                mut = float(t["mutasi"])
+                mutations.append({
+                    "transDate": str(t["tanggal"]).replace("'", "").strip(),
+                    "description": t["keterangan"],
+                    "amount": mut if t["tipe"] == "CR" else -mut,
+                    "balance": float(t["saldo"])
+                })
+            save_aol_json(tria_json, rek, sa, sak, mutations)
+
+            with open(tria_json, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            for m in data["mutationList"]:
+                self.assertNotIn("PEND", m["transDate"])
+                self.assertTrue(bool(re.match(r'^\d{2}/\d{2}/\d{4}$', m["transDate"])))
+
+            # 5 transaksi terakhir di JSON harus bertanggal 15/10/2026
+            for m in data["mutationList"][-5:]:
+                self.assertEqual(m["transDate"], "15/10/2026")
+        finally:
+            if os.path.exists(tria_json):
+                os.remove(tria_json)
+
+    def test_clean_bca_description_unit(self):
+        """Verifikasi pembersihan deskripsi BCA per modul fungsi clean_bca_description"""
+        from processors.bca_processor import clean_bca_description
+
+        # E-Banking CR
+        c1 = clean_bca_description("TRSF E-BANKING CR 0110/FTSCY/WS95271         310000.00MELLISA PUTRI ST")
+        self.assertIn("TRSF E-BANKING CR - ", c1)
+        self.assertIn("310000.00 MELLISA", c1)
+
+        # Virtual Account DB
+        c2 = clean_bca_description("TRSF E-BANKING DB 0110/FTFVA/WS9532120886/META ADS    -                 -                 14003515649")
+        self.assertIn("TRSF E-BANKING DB - ", c2)
+        self.assertIn("WS95321 20886/", c2)
+        self.assertIn("- -", c2)
+
+        # BI-FAST
+        c3 = clean_bca_description("BI-FAST CR TRANSFER   DR 009 TAURIN")
+        self.assertIn("BI-FAST CR - BIF TRANSFER", c3)
+
+        # QRIS (KR OTOMATIS)
+        c4 = clean_bca_description("KR OTOMATIS TANGGAL :03/10    MID : 885001895042RENSAWALLPAPER ANTQR :    1111000.00DDR:       7564.90")
+        self.assertIn("KR OTOMATIS - MID :", c4)
+        self.assertIn("885001895042 RENSAWALLPAPER", c4)
+        self.assertIn("ANT QR :", c4)
+        self.assertIn("1111000.00 DDR:", c4)
+
+        # EDC (KARTU KREDIT)
+        c5 = clean_bca_description("KARTU KREDIT MID:001895040     RENSAWALLPAPERSAMATGH:00002181600.00ADM:00000040360.00")
+        self.assertIn("KARTU KREDIT - MID:001895040", c5)
+        self.assertIn("RENSAWALLPAPERSAMA TGH:", c5)
+        self.assertIn(".00 ADM:", c5)
+
 if __name__ == '__main__':
     unittest.main()
 

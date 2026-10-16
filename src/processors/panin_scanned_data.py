@@ -516,9 +516,9 @@ def extract_scanned_panin_transactions(filepath, log_callback=print):
     total_kredit = 0.0
 
     for idx, tx in enumerate(target_txs):
-        deb = tx["deb"]
-        kre = tx["kre"]
-        bal = tx["bal"]
+        deb: float = float(tx["deb"])
+        kre: float = float(tx["kre"])
+        bal: float = float(tx["bal"])
 
         expected_balance_cr = round(current_balance + kre, 2)
         expected_balance_db = round(current_balance - deb, 2)
