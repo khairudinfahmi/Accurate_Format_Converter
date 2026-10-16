@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 import tempfile
+import time
 
 # ==============================================================
 # KONFIGURASI PENTING
@@ -94,8 +95,16 @@ class LauncherApp:
 
     def run_update_logic(self):
         try:
-            # 1. Periksa versi pada server
-            req = urllib.request.Request(UPDATE_INFO_URL, headers={'User-Agent': 'Mozilla/5.0'})
+            # 1. Periksa versi pada server (dengan cache-buster untuk mencegah penundaan cache CDN)
+            bust_url = f"{UPDATE_INFO_URL}?t={int(time.time())}"
+            req = urllib.request.Request(
+                bust_url, 
+                headers={
+                    'User-Agent': 'Mozilla/5.0',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
+                }
+            )
             with urllib.request.urlopen(req, timeout=5) as response:
                 data = json.loads(response.read().decode())
                 
