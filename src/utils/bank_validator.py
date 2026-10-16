@@ -48,7 +48,7 @@ def detect_bank_from_file(filepath: str) -> tuple[str | None, str]:
                 is_bca_general = "BANK CENTRAL ASIA" in upper or "KLIKBCA" in upper or "WWW.KLIKBCA.COM" in upper
 
                 if is_bca_giro or is_bca_tahapan or is_bca_general:
-                    detail = "e-Statement BCA Giro / KlikBCA Bisnis" if is_bca_giro else "e-Statement BCA Tahapan"
+                    detail = "e-Statement BCA Giro / myBCA / KlikBCA Bisnis" if is_bca_giro else "e-Statement BCA Tahapan"
                     return "BCA", f"Terdeteksi {detail}"
 
                 # --- B. DETEKSI TANDA TANGAN PANIN ---
@@ -87,13 +87,19 @@ def detect_bank_from_file(filepath: str) -> tuple[str | None, str]:
         try:
             with open(filepath, 'r', encoding='utf-8-sig', errors='ignore') as f:
                 lines = [f.readline() for _ in range(30)]
-            text = "".join(lines).upper()
+            text = "".join(lines).upper().replace('""', '"')
+            base_upper = os.path.basename(filepath).upper()
 
-            # Format CSV BCA (KlikBCA Individu & Giro)
-            if "NO. REKENING :" in text or ("TANGGAL TRANSAKSI" in text and "KETERANGAN" in text and "CABANG" in text):
-                return "BCA", "Terdeteksi format CSV resmi BCA (KlikBCA)"
-            if "TANGGAL,KETERANGAN,CABANG,JUMLAH" in text.replace(" ", ""):
-                return "BCA", "Terdeteksi template CSV mutasi BCA"
+            # Format CSV BCA (KlikBCA Individu, Giro, myBCA, Template BCA)
+            if "NO. REKENING" in text or ("TANGGAL" in text and "KETERANGAN" in text and ("CABANG" in text or "MUTASI" in text or "SALDO" in text)):
+                if "MUTASI" in text and "JENIS TRANSAKSI" in text:
+                    return "BCA", "Terdeteksi format CSV resmi BCA (myBCA / KlikBCA)"
+                if "JUMLAH" in text and "SALDO" in text:
+                    return "BCA", "Terdeteksi template CSV mutasi BCA"
+                if "TANGGAL TRANSAKSI" in text:
+                    return "BCA", "Terdeteksi format CSV resmi BCA (myBCA / KlikBCA)"
+                if "MUTASIREKENING_" in base_upper or "BCA" in base_upper:
+                    return "BCA", "Terdeteksi format CSV mutasi BCA"
 
             # Format CSV Panin
             if "PANIN" in text or ("TANGGAL" in text and "SALDO" in text and ("DEBET" in text or "DEBIT" in text) and "KREDIT" in text):
@@ -101,6 +107,9 @@ def detect_bank_from_file(filepath: str) -> tuple[str | None, str]:
 
             if "MANDIRI" in text:
                 return "Mandiri", "Terdeteksi format CSV Bank Mandiri"
+
+            if "MUTASIREKENING_" in base_upper:
+                return "BCA", "Terdeteksi dokumen mutasi BCA"
 
         except Exception as e:
             return None, f"Gagal membaca CSV: {e}"
@@ -111,11 +120,18 @@ def detect_bank_from_file(filepath: str) -> tuple[str | None, str]:
     elif ext in ['.xls', '.xlsx']:
         try:
             import pandas as pd
+            base_upper = os.path.basename(filepath).upper()
             # Baca beberapa baris pertama secara toleran
             df = pd.read_excel(filepath, nrows=25, header=None)
             raw_str = " ".join(df.astype(str).values.flatten()).upper()
 
             if "BCA" in raw_str or "NO. REKENING :" in raw_str:
+                return "BCA", "Terdeteksi data mutasi BCA dalam format Excel"
+
+            if "MUTASI" in raw_str and "JENIS TRANSAKSI" in raw_str and "SALDO" in raw_str:
+                return "BCA", "Terdeteksi data mutasi BCA (myBCA) dalam format Excel"
+
+            if "MUTASIREKENING_" in base_upper:
                 return "BCA", "Terdeteksi data mutasi BCA dalam format Excel"
 
             if "PANIN" in raw_str or "DETIL REKENING" in raw_str or ("TANGGAL" in raw_str and "SALDO" in raw_str and ("DEBET" in raw_str or "DEBIT" in raw_str) and "KREDIT" in raw_str):
@@ -140,10 +156,10 @@ def validate_bank_selection(filepath: str, selected_bank: str) -> tuple[bool, st
     # Kasus 1: Bank terdeteksi dan TIDAK cocok dengan bank yang dipilih
     if detected_bank and detected_bank.lower() != selected_bank.lower():
         msg = (
-            f"File yang Anda pilih terdeteksi sebagai dokumen mutasi BANK {detected_bank.upper()}, "
-            f"bukan BANK {selected_bank.upper()}.\n\n"
+            f"File yang Anda pilih terdeteksi sebagai dokumen mutasi Bank {detected_bank}, "
+            f"bukan Bank {selected_bank}.\n\n"
             f"Keterangan: {reason}\n\n"
-            f"Sistem menolak memproses untuk mencegah data corrupt pada format Accurate.\n"
+            f"Sistem menolak memproses untuk mencegah data rusak pada format Accurate.\n"
             f"Silakan ubah pilihan bank menjadi '{detected_bank}' pada menu di sudut kanan atas."
         )
         return False, msg, detected_bank
@@ -157,8 +173,8 @@ def validate_bank_selection(filepath: str, selected_bank: str) -> tuple[bool, st
     
     # Validasi ekstensi dasar
     if selected_bank == "BCA":
-        if ext not in ['.pdf', '.csv']:
-            msg = f"Format file '{ext}' tidak didukung untuk Bank BCA. Mutasi BCA harus dalam format PDF atau CSV."
+        if ext not in ['.pdf', '.csv', '.xlsx', '.xls']:
+            msg = f"Format file '{ext}' tidak didukung untuk Bank BCA. Mutasi BCA harus dalam format PDF, CSV, atau Excel (.xlsx/.xls)."
             return False, msg, None
     elif selected_bank == "Panin":
         if ext not in ['.xls', '.xlsx', '.csv', '.pdf']:

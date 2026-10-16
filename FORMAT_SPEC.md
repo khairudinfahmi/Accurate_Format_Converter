@@ -14,12 +14,14 @@ di bawah ini TANPA persetujuan eksplisit dari pemilik project (Fahmi).
 ## Daftar Isi
 
 1. Arsitektur Project
-2. Spesifikasi Output PANIN (Format XLS)
-3. Spesifikasi Output BCA (Format CSV + XLS Excel Formatter + KlikBCA CSV)
+2. Spesifikasi Output PANIN (Format XLS & JSON AOL)
+3. Spesifikasi Output BCA (Format JSON, XLS, CSV Tahapan & CSV Giro)
 4. Logika Dummy Row
 5. Logika Currency & Date Parsing
 6. Styling XLS (Warna, Font, Format Angka)
 7. Daftar File Kritis (Jangan Diubah Strukturnya)
+8. Spesifikasi Output JSON Accurate Online (AOL JSON Format)
+9. Konteks Status "Klop" & Sudut Pandang Debet/Kredit Bank
 
 
 ---
@@ -56,7 +58,7 @@ Accurate_Format_Converter/
 
 ---
 
-## 2. Spesifikasi Output PANIN (Format XLS - `XXXXX (Template Excel Formatter).xls`)
+## 2. Spesifikasi Output PANIN (Format XLS - `XXXXX (Template AOL Format Excel (Non-JSON)).xls`)
 
 ### 2.1 Kolom Output (Urutan Wajib)
 
@@ -122,12 +124,13 @@ saldo sebelum transaksi pertama terjadi.
 
 ## 3. Spesifikasi Output BCA
 
-BCA menghasilkan 3 file output sekaligus di dalam satu folder (`XXXXX (1 - Template Rekening Tahapan).csv`, `XXXXX (2 - Template Excel Formatter).xls`, & `XXXXX (3 - Template Rekening Giro).csv`):
-1. CSV Standar (`1 - Template Rekening Tahapan`) -- Untuk di-import ke Accurate Online (opsi Rekening Tahapan)
-2. XLS (`2 - Template Excel Formatter`) -- Alternatif template import Accurate Online (struktur sel terproteksi sama seperti format Panin)
-3. KlikBCA CSV (`3 - Template Rekening Giro`) -- Replika asli ekspor KlikBCA Business (untuk di-import ke Accurate Online opsi Rekening Giro)
+BCA menghasilkan 4 file output sekaligus di dalam satu folder:
+1. JSON (`1 - Template AOL Format JSON.json`) -- **Paling Direkomendasikan**, format resmi skema JSON Accurate Online yang paling stabil dan baku terhadap perubahan layout bank.
+2. XLS (`2 - Template AOL Format Excel (Non-JSON).xls`) -- Alternatif template import Accurate Online (struktur sel terproteksi sama seperti format Panin).
+3. CSV Standar (`3 - Template Rekening Tahapan.csv`) -- Untuk di-import ke Accurate Online (opsi Rekening Tahapan).
+4. CSV Giro (`4 - Template Rekening Giro.csv`) -- Replika resmi CSV mutasi Giro (myBCA / KlikBCA) untuk opsi Rekening Giro.
 
-### 3.1 Format CSV BCA (`1 - Template Rekening Tahapan`)
+### 3.1 Format CSV BCA (`3 - Template Rekening Tahapan.csv`)
 
 #### Header Metadata (Baris 1-4):
 ```csv
@@ -254,9 +257,9 @@ Perbedaan dengan Panin:
   Karena PDF BCA hanya menyediakan dd/mm, tahun diambil dari tahun saat ini.
 - Kolom debet/kredit dipisah (sama seperti Panin)
 
-### 3.4 Format CSV KlikBCA (`3 - Template Rekening Giro`)
+### 3.4 Format CSV Giro (`4 - Template Rekening Giro.csv`)
 
-Format ini adalah replika 100% dari CSV ekspor KlikBCA Business.
+Format ini adalah replika resmi CSV ekspor mutasi Giro (myBCA / KlikBCA).
 Sangat sensitif terhadap spasi, tanda kutip, dan koma.
 
 #### Aturan Quoting & Line Ending:
@@ -443,13 +446,81 @@ dengan template import Accurate Online.
 
 ---
 
+## 8. Spesifikasi Output JSON Accurate Online (AOL JSON Format)
+
+Format ini adalah format resmi JSON Accurate Online yang kompatibel dengan skema baku pada `templatehasilkonversi/sample-file-aol-format-json.json`. Format ini secara otomatis dihasilkan sebagai berkas pendamping stabil di samping format XLS dan CSV.
+
+### 8.1 Skema Struktur JSON
+
+```json
+{
+    "accountNumber": "07101999",
+    "openingBalance": 500000000.0,
+    "closingBalance": 555000000.0,
+    "mutationList": [
+        {
+            "transDate": "30/10/2023",
+            "description": "TRANSFER FROM CUSTOMER",
+            "amount": 50000000.0,
+            "balance": 550000000.0
+        },
+        {
+            "transDate": "05/11/2023",
+            "description": "ELECTRICITY BILL",
+            "amount": -1000000.0,
+            "balance": 549000000.0
+        }
+    ]
+}
+```
+
+### 8.2 Aturan Nilai & Tipe Data
+- `accountNumber` (string): Nomor rekening bank.
+- `openingBalance` (number): Nilai saldo awal buku kas.
+- `closingBalance` (number): Nilai saldo akhir buku kas.
+- `mutationList` (array of objects):
+  - `transDate` (string): Tanggal transaksi format baku `DD/MM/YYYY`.
+  - `description` (string): Keterangan/uraian transaksi.
+  - `amount` (number): Mutasi bertanda matematis.
+    - **Uang Masuk (Kredit / CR):** Bernilai POSITIF (`> 0`).
+    - **Uang Keluar (Debet / DB):** Bernilai NEGATIF (`< 0`).
+  - `balance` (number): Saldo berjalan setelah transaksi.
+
+### 8.3 Invarian Matematika
+```
+openingBalance + sum(mutationList.amount) == closingBalance
+```
+
+---
+
+## 9. Konteks Status "Klop" & Sudut Pandang Debet/Kredit Bank
+
+Meskipun hasil konversi secara matematis sudah 100% tepat, terdapat tiga prinsip teknis utama:
+
+1. **"Klop" Mengacu pada Integritas Konversi File (Bukan Rekonsiliasi Buku Besar Accurate)**:
+   - Status `[Cocok / Klop]` membuktikan bahwa data file output (CSV / XLS / JSON) identik 100% dengan dokumen asli tarikan bank (myBCA / KlikBCA / Panin).
+   - Menjamin tidak ada transaksi yang terlewat (*skipped*) dan tidak ada distorsi nominal akibat pemisah desimal/ribuan.
+   - Rekonsiliasi akuntansi dengan buku besar kas perusahaan tetap dilakukan di dalam modul Bank Reconcile Accurate Online setelah proses impor.
+
+2. **Sudut Pandang Debet & Kredit Mengikuti Standar Rekening Koran Bank**:
+   - Walaupun judul tabel referensi adalah Saldo Kas, penentuan arah mutasi menggunakan standar perbankan:
+     - **Kredit (CR)**: Uang Masuk / Penambahan Saldo Kas Bank (`+`).
+     - **Debet (DB)**: Uang Keluar / Pengurangan Saldo Kas Bank (`-`).
+   - Format ini dirancang khusus untuk fitur impor mutasi rekening koran (*Smartlink e-Banking*) di Accurate Online, yang berposisi cermin terhadap jurnal umum akuntansi internal entitas.
+
+3. **Rekomendasi Pemilihan Format Paling Stabil**:
+   - Format **Template 1 (Format JSON AOL)** sangat direkomendasikan karena skema JSON resmi Accurate Online bersifat baku, terstruktur rapi, dan paling tahan terhadap perubahan format atau tata letak perbankan.
+
+---
+
 ## Catatan Akhir
 
-Dokumen ini dibuat berdasarkan kode versi 4.3.0 yang sudah 100% terverifikasi dan cocok
-dengan template import Accurate Online per tanggal 14 Juni 2026.
+Dokumen ini diperbarui untuk memuat dukungan format JSON resmi Accurate Online (AOL)
+di samping format XLS dan CSV eksisting.
 
 Jika ada AI atau developer lain yang diminta mengubah kode, WAJIB baca
 dokumen ini terlebih dahulu dan JANGAN mengubah format output tanpa
 memahami dampaknya terhadap kompatibilitas import Accurate Online.
 
 ---
+

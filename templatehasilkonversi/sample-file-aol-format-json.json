@@ -1,0 +1,25 @@
+{
+    "accountNumber": "07101999",
+    "openingBalance": 500000000,
+    "closingBalance": 555000000,
+    "mutationList": [
+        {
+            "transDate": "30/10/2023",
+            "description": "TRANSFER FROM CUSTOMER",
+            "amount": 50000000,
+            "balance": 550000000
+        },
+        {
+            "transDate": "05/11/2023",
+            "description": "ELECTRICITY BILL",
+            "amount": -1000000,
+            "balance": 549000000
+        },
+        {
+            "transDate": "08/11/2023",
+            "description": "TRANSFER BANK",
+            "amount": 6000000,
+            "balance": 555000000
+        }
+    ]
+}

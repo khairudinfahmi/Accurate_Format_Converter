@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Accurate Format Converter"
-#define MyAppVersion "4.5.3"
+#define MyAppVersion "5.0.0"
 #define MyAppPublisher "khairudinfahmi"
 #define MyAppExeName "Launcher.exe"
 
@@ -16,7 +16,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 UninstallDisplayName={#MyAppName}
-OutputBaseFilename=Accurate_Converter_Setup_v4.5.3
+OutputBaseFilename=Accurate_Converter_Setup_v5.0.0
 SetupIconFile=assets\rensa_logo.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma

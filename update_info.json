@@ -1,7 +1,5 @@
 {
-  "latest_version": "4.5.3",
-  "download_url": "https://www.dropbox.com/scl/fi/jjk5k77hd4cas6g5uyq1a/Accurate_Converter_Setup_v4.5.3.exe?rlkey=7xed9un3fjq73651qm5iu5gmx&st=9vjryd51&dl=1&ext=.exe",
-  "release_notes": "Pembaruan v4.5.3:\n- Lembar Rekonsiliasi Kas & Bank: Menampilkan tabel pencocokan mutasi dan saldo kas rekening koran dengan hasil file format Excel (.xls) sebelum di-import ke Accurate Online (khusus Panin dan BCA).\n- Rincian Mutasi Kas: Menyajikan perbandingan saldo awal, mutasi debet (uang keluar), mutasi kredit (uang masuk), saldo akhir, serta rincian jumlah transaksi debet dan kredit secara terpisah.\n- Koreksi Otomatis Posisi Mutasi: Membetulkan otomatis transaksi yang posisinya tertukar antara debet dan kredit pada file sumber sehingga saldo akhir buku kas 100% klop tanpa selisih (Rp 0.00)."
+  "latest_version": "5.0.0",
+  "download_url": "https://www.dropbox.com/scl/fi/jjk5k77hd4cas6g5uyq1a/Accurate_Converter_Setup_v5.0.0.exe?rlkey=7xed9un3fjq73651qm5iu5gmx&st=9vjryd51&dl=1&ext=.exe",
+  "release_notes": "Pembaruan Akbar v5.0.0:\n- Format Resmi Accurate Online (AOL) JSON: Menghasilkan file ekspor .json berstandar resmi AOL dengan validasi tanda mutasi (negatif untuk debet, positif untuk kredit) dan persamaan matematis saldo kas terverifikasi 100% klop (Rp 0.00) untuk Bank BCA dan Panin.\n- Dukungan Mutasi BCA Format Excel (.xlsx/.xls): Membaca langsung mutasi rekening BCA dari berkas Excel dengan deteksi dynamic header.\n- Universal BCA Engine: Mendukung seluruh varian mutasi BCA (PDF Giro, PDF Tahapan, myBCA CSV dengan quote unescaping, serta template CSV) dengan kalkulasi otomatis Saldo Awal (Backward Derivation) dan deteksi nomor rekening.\n- Output 4-in-1 BCA: Otomatis memproduksi 4 format sekaligus ke dalam 1 folder khusus (1 - Template AOL Format JSON, 2 - Template AOL Format Excel (Non-JSON), 3 - Template Rekening Tahapan, dan 4 - Template Rekening Giro).\n- Rekomendasi Format Stabil: Disarankan memprioritaskan Template 1 (Format JSON AOL) karena paling stabil dan tahan terhadap perubahan format laporan perbankan."
 }
-
-

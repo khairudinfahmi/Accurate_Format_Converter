@@ -1,3 +1,4 @@
+import os
 import re
 import csv
 import itertools
@@ -122,88 +123,143 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
         log_callback("-" * 45)
         progress_callback(0.1)
         
-        with open(filepath, 'r', encoding='utf-8-sig') as f:
-            reader = csv.reader(f)
-            lines = list(reader)
-        
+        basename = os.path.basename(filepath)
         rekening = "1234567890"
+        rek_m = re.search(r'(?:MutasiRekening_|No\.?\s*Rekening[\s:=]*\'?)(\d{8,16})', basename, re.IGNORECASE)
+        if rek_m:
+            rekening = rek_m.group(1)
+
         nama = "NASABAH BCA"
-        saldo_awal = 0.0
-        saldo_akhir = 0.0
+        saldo_awal = None
+        saldo_akhir = None
         mutasi_debet_summary = None
         mutasi_kredit_summary = None
         periode_raw = ""
         transactions = []
-        
+
+        raw_lines = []
+        with open(filepath, 'r', encoding='utf-8-sig', errors='ignore') as f:
+            for line in f:
+                l = line.strip()
+                if l.startswith('"') and l.endswith('"') and '""' in l:
+                    l = l[1:-1].replace('""', '"')
+                raw_lines.append(l)
+
+        reader = list(csv.reader(raw_lines))
         data_started = False
-        
-        for i, row in enumerate(lines):
-            if not row:
+        header_cols = {}
+
+        for row in reader:
+            if not row or not any(row):
                 continue
-            
-            line_str = "".join(row)
-            
-            if "No. rekening :" in line_str:
-                match = re.search(r'No\.\s*rekening\s*:\s*(\d+)', line_str, re.IGNORECASE)
-                if match: rekening = match.group(1)
-            elif "Nama :" in line_str:
-                match = re.search(r'Nama\s*:\s*(.*)', line_str, re.IGNORECASE)
-                if match: nama = match.group(1).strip()
-            elif "Periode :" in line_str:
-                match = re.search(r'Periode\s*:\s*(.*)', line_str, re.IGNORECASE)
-                if match: periode_raw = match.group(1).strip()
-            elif "Saldo Awal :" in line_str:
-                match = re.search(r'Saldo Awal\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
-                if match: saldo_awal = clean_currency(match.group(1))
-            elif "Saldo Akhir :" in line_str:
-                match = re.search(r'Saldo Akhir\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
-                if match: saldo_akhir = clean_currency(match.group(1))
-            elif "Mutasi Debet :" in line_str or "Mutasi Debit :" in line_str:
-                match = re.search(r'Mutasi\s*Deb[ei]t\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
-                if match: mutasi_debet_summary = clean_currency(match.group(1))
-            elif "Mutasi Kredit :" in line_str:
-                match = re.search(r'Mutasi\s*Kredit\s*:\s*([\d\,\.]+)', line_str, re.IGNORECASE)
-                if match: mutasi_kredit_summary = clean_currency(match.group(1))
-            
-            if len(row) >= 5 and "Tanggal Transaksi" in row[0] and "Keterangan" in row[1]:
+            line_str = " ".join(row)
+
+            # Metadata parsing (toleran ':' maupun '=')
+            if "No. rekening" in line_str or "No. Rekening" in line_str:
+                m = re.search(r'No\.?\s*rekening\s*(?::|=)\s*\'?(\d+)', line_str, re.IGNORECASE)
+                if m: rekening = m.group(1)
+            elif "Nama" in line_str and ("=" in line_str or ":" in line_str):
+                m = re.search(r'Nama\s*(?::|=)\s*([^\n\r,]+)', line_str, re.IGNORECASE)
+                if m: nama = m.group(1).strip()
+            elif "Periode" in line_str and ("=" in line_str or ":" in line_str):
+                m = re.search(r'Periode\s*(?::|=)\s*([^\n\r,]+)', line_str, re.IGNORECASE)
+                if m: periode_raw = m.group(1).strip()
+            elif "Saldo Awal" in line_str:
+                m = re.search(r'Saldo\s*Awal\s*(?::|=)\s*\'?([\d\,\.]+)', line_str, re.IGNORECASE)
+                if m: saldo_awal = clean_currency(m.group(1))
+            elif "Saldo Akhir" in line_str:
+                m = re.search(r'Saldo\s*Akhir\s*(?::|=)\s*\'?([\d\,\.]+)', line_str, re.IGNORECASE)
+                if m: saldo_akhir = clean_currency(m.group(1))
+            elif "Mutasi Debet" in line_str or "Debet" in line_str:
+                m = re.search(r'(?:Mutasi\s*)?Deb[ei]t\s*(?::|=)\s*\'?([\d\,\.]+)', line_str, re.IGNORECASE)
+                if m: mutasi_debet_summary = clean_currency(m.group(1))
+            elif "Mutasi Kredit" in line_str or "Kredit" in line_str:
+                m = re.search(r'(?:Mutasi\s*)?Kredit\s*(?::|=)\s*\'?([\d\,\.]+)', line_str, re.IGNORECASE)
+                if m: mutasi_kredit_summary = clean_currency(m.group(1))
+
+            # Table Header Check
+            row_lower = [c.lower().strip() for c in row]
+            if not data_started and any('tanggal' in c for c in row_lower) and any(c in ('keterangan', 'uraian') for c in row_lower):
                 data_started = True
+                for idx, c in enumerate(row_lower):
+                    if 'tanggal' in c: header_cols['tgl'] = idx
+                    elif 'keterangan' in c or 'uraian' in c: header_cols['desc'] = idx
+                    elif 'cabang' in c: header_cols['cab'] = idx
+                    elif 'mutasi' in c or 'jumlah' in c: header_cols['mut'] = idx
+                    elif 'jenis' in c or 'tipe' in c: header_cols['type'] = idx
+                    elif 'saldo' in c: header_cols['bal'] = idx
                 continue
-                
+
             if data_started:
-                if len(row) >= 5 and re.match(r'\d{2}/\d{2}', row[0]):
-                    tgl_match = re.search(r'(\d{2}/\d{2})', row[0])
-                    tgl_clean = tgl_match.group(1) if tgl_match else row[0]
-                    
-                    desc = row[1]  # Preserve trailing spaces (jangan strip)
-                    cabang = row[2].strip()
-                    
-                    jumlah_str = row[3].strip()
-                    mutasi = 0.0
-                    tipe = "CR"
-                    j_upper = jumlah_str.upper()
-                    if " CR" in j_upper or j_upper.endswith("CR") or re.search(r'\bCR\b', j_upper):
-                        tipe = "CR"
-                        mutasi = clean_currency(re.sub(r'CR', '', j_upper, flags=re.IGNORECASE))
-                    elif " DB" in j_upper or j_upper.endswith("DB") or re.search(r'\bDB\b', j_upper):
-                        tipe = "DB"
-                        mutasi = clean_currency(re.sub(r'DB', '', j_upper, flags=re.IGNORECASE))
+                # Stop / lewati jika baris ringkasan footer tercapai
+                if any(k in line_str.upper() for k in ["SALDO AWAL", "SALDO AKHIR", "MUTASI DEBET", "MUTASI KREDIT"]):
+                    continue
+
+                col_tgl_idx = header_cols.get('tgl', 0)
+                if len(row) <= col_tgl_idx:
+                    continue
+                tgl_cell = row[col_tgl_idx].strip()
+                if not any(ch.isdigit() for ch in tgl_cell) and "PEND" not in tgl_cell.upper():
+                    continue
+
+                # Format Tanggal
+                t_m = re.search(r'(\d{2}/\d{2}(?:/\d{4})?)', tgl_cell)
+                tgl_clean = t_m.group(1) if t_m else ("PEND" if "PEND" in tgl_cell.upper() else tgl_cell)
+
+                desc = row[header_cols['desc']] if 'desc' in header_cols and len(row) > header_cols['desc'] else ""
+                cab_raw = row[header_cols['cab']].replace("'", "").strip() if 'cab' in header_cols and len(row) > header_cols['cab'] else "0000"
+                cab_clean = f"{int(float(cab_raw)):04d}" if re.match(r'^\d+(\.0+)?$', cab_raw) else cab_raw
+
+                # Mutasi & Tipe
+                mutasi_val = 0.0
+                tipe_val = "CR"
+
+                if 'type' in header_cols and len(row) > header_cols['type'] and header_cols['type'] is not None:
+                    mutasi_val = clean_currency(row[header_cols['mut']])
+                    t_str = row[header_cols['type']].upper().strip()
+                    tipe_val = "DB" if "DB" in t_str else "CR"
+                else:
+                    # Cek varian 6 kolom (misal template BCA format 1: Tanggal, Keterangan, Cabang, Jumlah, Tipe, Saldo)
+                    if len(row) >= 6 and row[4].strip().upper() in ('CR', 'DB'):
+                        tipe_val = row[4].strip().upper()
+                        mutasi_val = clean_currency(row[3])
                     else:
-                        mutasi = clean_currency(jumlah_str)
-                    
-                    saldo = clean_currency(row[4])
-                    
-                    transactions.append({
-                        "tanggal": "'" + tgl_clean,
-                        "keterangan": desc,
-                        "cabang": "'" + cabang,
-                        "mutasi": mutasi,
-                        "tipe": tipe,
-                        "saldo_printed": saldo,
-                        "saldo": saldo
-                    })
-                    
+                        mut_str = row[header_cols['mut']].upper() if 'mut' in header_cols and len(row) > header_cols['mut'] else ""
+                        if " CR" in mut_str or mut_str.endswith("CR") or re.search(r'\bCR\b', mut_str):
+                            tipe_val = "CR"
+                            mutasi_val = clean_currency(re.sub(r'CR', '', mut_str, flags=re.IGNORECASE))
+                        elif " DB" in mut_str or mut_str.endswith("DB") or re.search(r'\bDB\b', mut_str):
+                            tipe_val = "DB"
+                            mutasi_val = clean_currency(re.sub(r'DB', '', mut_str, flags=re.IGNORECASE))
+                        else:
+                            tipe_val = "CR"
+                            mutasi_val = clean_currency(mut_str)
+
+                saldo_val = clean_currency(row[header_cols['bal']]) if 'bal' in header_cols and len(row) > header_cols['bal'] else 0.0
+
+                transactions.append({
+                    "tanggal": "'" + tgl_clean,
+                    "keterangan": desc,
+                    "cabang": "'" + (cab_clean if cab_clean else "0000"),
+                    "mutasi": mutasi_val,
+                    "tipe": tipe_val,
+                    "saldo_printed": saldo_val,
+                    "saldo": saldo_val
+                })
+
         if not transactions:
             raise Exception("File CSV berhasil dibaca, namun tidak ditemukan data transaksi BCA.")
+
+        # Hitung Saldo Awal jika tidak ada di header
+        if saldo_awal is None:
+            first_tx = transactions[0]
+            if first_tx.get("saldo_printed") is not None:
+                if first_tx["tipe"] == "CR":
+                    saldo_awal = round(first_tx["saldo_printed"] - first_tx["mutasi"], 2)
+                else:
+                    saldo_awal = round(first_tx["saldo_printed"] + first_tx["mutasi"], 2)
+            else:
+                saldo_awal = 0.0
 
         # --- Fase 2 (CSV): Validasi Silang Matematika Saldo (Self-Healing Fail-Safe) ---
         transactions, current_balance, valid_count, total_debet, total_kredit = _reconcile_bca_transactions(
@@ -221,7 +277,7 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
             "saldo_awal": saldo_awal,
             "debet": mutasi_debet_summary if mutasi_debet_summary is not None else total_debet,
             "kredit": mutasi_kredit_summary if mutasi_kredit_summary is not None else total_kredit,
-            "saldo_akhir": saldo_akhir if saldo_akhir > 0 else current_balance,
+            "saldo_akhir": saldo_akhir if (saldo_akhir and saldo_akhir > 0) else current_balance,
             "count_deb": out_count_deb,
             "count_kre": out_count_kre,
             "count": valid_count
@@ -249,10 +305,153 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
     except Exception as e:
         error_callback(str(e))
 
+def _process_bca_excel(filepath, log_callback, progress_callback, success_callback, error_callback):
+    try:
+        log_callback("-" * 45)
+        log_callback("Memulai proses konversi BCA (dari Excel)...")
+        log_callback("-" * 45)
+        progress_callback(0.1)
+
+        basename = os.path.basename(filepath)
+        rekening = "1234567890"
+        rek_m = re.search(r'(?:MutasiRekening_|No\.?\s*Rekening[\s:=]*\'?)(\d{8,16})', basename, re.IGNORECASE)
+        if rek_m:
+            rekening = rek_m.group(1)
+
+        nama = "NASABAH BCA"
+        saldo_awal = None
+        saldo_akhir = None
+        periode_raw = ""
+        date_m = re.search(r'(\d{4})(\d{2})(\d{2})', basename)
+        if date_m:
+            periode_raw = f"{date_m.group(3)}/{date_m.group(2)}/{date_m.group(1)}"
+        transactions = []
+
+        import pandas as pd
+        df = pd.read_excel(filepath)
+
+        header_row_idx = None
+        for r in range(min(10, len(df))):
+            row_str = " ".join([str(x).lower() for x in df.iloc[r].values])
+            if "tanggal" in row_str and ("mutasi" in row_str or "jumlah" in row_str or "saldo" in row_str):
+                header_row_idx = r
+                break
+
+        if header_row_idx is not None:
+            df.columns = df.iloc[header_row_idx]
+            df = df.iloc[header_row_idx + 1:].reset_index(drop=True)
+
+        col_map = {}
+        for c in df.columns:
+            cs = c.lower().strip()
+            if 'tanggal' in cs: col_map['tgl'] = c
+            elif 'keterangan' in cs or 'uraian' in cs: col_map['desc'] = c
+            elif 'cabang' in cs: col_map['cab'] = c
+            elif 'mutasi' in cs or 'jumlah' in cs: col_map['mut'] = c
+            elif 'jenis' in cs or 'tipe' in cs: col_map['type'] = c
+            elif 'saldo' in cs: col_map['bal'] = c
+
+        if 'tgl' not in col_map or 'mut' not in col_map or 'bal' not in col_map:
+            raise Exception("Kolom tabel mutasi BCA (Tanggal, Mutasi/Jumlah, Saldo) tidak lengkap di file Excel.")
+
+        for _, row in df.iterrows():
+            tgl_raw = str(row[col_map['tgl']]).strip()
+            if not any(ch.isdigit() for ch in tgl_raw) and "PEND" not in tgl_raw.upper():
+                continue
+
+            t_m = re.search(r'(\d{2}/\d{2}(?:/\d{4})?)', tgl_raw)
+            if t_m:
+                tgl_clean = t_m.group(1)
+            elif "PEND" in tgl_raw.upper():
+                tgl_clean = "PEND"
+            else:
+                tgl_clean = tgl_raw
+
+            desc = str(row[col_map['desc']]).strip() if 'desc' in col_map else ""
+            cab_raw = str(row[col_map['cab']]).strip() if 'cab' in col_map else "0000"
+            cab_clean = f"{int(float(cab_raw)):04d}" if re.match(r'^\d+(\.0+)?$', cab_raw) else cab_raw
+
+            mutasi_val = clean_currency(row[col_map['mut']])
+            tipe_val = "CR"
+            if 'type' in col_map:
+                t_str = str(row[col_map['type']]).upper().strip()
+                tipe_val = "DB" if "DB" in t_str else "CR"
+            else:
+                m_str = str(row[col_map['mut']]).upper()
+                tipe_val = "DB" if "DB" in m_str else "CR"
+
+            saldo_val = clean_currency(row[col_map['bal']])
+
+            transactions.append({
+                "tanggal": "'" + tgl_clean,
+                "keterangan": desc,
+                "cabang": "'" + (cab_clean if cab_clean else "0000"),
+                "mutasi": mutasi_val,
+                "tipe": tipe_val,
+                "saldo_printed": saldo_val,
+                "saldo": saldo_val
+            })
+
+        if not transactions:
+            raise Exception("File Excel berhasil dibaca, namun tidak ditemukan baris transaksi BCA.")
+
+        # Hitung Saldo Awal backward dari baris pertama jika tidak ada di header
+        if saldo_awal is None:
+            first_tx = transactions[0]
+            if first_tx.get("saldo_printed") is not None:
+                if first_tx["tipe"] == "CR":
+                    saldo_awal = round(first_tx["saldo_printed"] - first_tx["mutasi"], 2)
+                else:
+                    saldo_awal = round(first_tx["saldo_printed"] + first_tx["mutasi"], 2)
+            else:
+                saldo_awal = 0.0
+
+        transactions, current_balance, valid_count, total_debet, total_kredit = _reconcile_bca_transactions(
+            transactions, saldo_awal, log_callback
+        )
+
+        progress_callback(0.9)
+
+        out_count_deb = sum(1 for tx in transactions if tx["tipe"] == "DB")
+        out_count_kre = sum(1 for tx in transactions if tx["tipe"] == "CR")
+
+        from utils.helpers import format_audit_reconciliation_table
+        source_summary = {
+            "label": "Ringkasan Excel BCA",
+            "saldo_awal": saldo_awal,
+            "debet": total_debet,
+            "kredit": total_kredit,
+            "saldo_akhir": current_balance,
+            "count_deb": out_count_deb,
+            "count_kre": out_count_kre,
+            "count": valid_count
+        }
+        output_summary = {
+            "label": "Hasil Format Accurate",
+            "saldo_awal": saldo_awal,
+            "debet": total_debet,
+            "kredit": total_kredit,
+            "saldo_akhir": current_balance,
+            "count_deb": out_count_deb,
+            "count_kre": out_count_kre,
+            "count": valid_count
+        }
+        audit_table = format_audit_reconciliation_table("BCA Excel", source_summary, output_summary)
+        log_callback("\n" + audit_table)
+        transactions[0]["_audit_table"] = audit_table
+
+        if periode_raw and transactions:
+            transactions[0]["_periode_raw"] = periode_raw
+
+        success_callback(transactions, rekening, nama, saldo_awal, current_balance, filepath)
+
+    except Exception as e:
+        error_callback(str(e))
+
 def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, success_callback, error_callback):
     try:
         log_callback("-" * 45)
-        log_callback("Memulai proses konversi BCA (Format Giro / KlikBCA Bisnis)...")
+        log_callback("Memulai proses konversi BCA (Format Giro / myBCA / KlikBCA)...")
         log_callback("-" * 45)
         progress_callback(0.1)
 
@@ -434,7 +633,7 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
         # Validasi Rekonsiliasi Otomatis terhadap Ringkasan Bank
         from utils.helpers import format_audit_reconciliation_table
         source_summary = {
-            "label": "Ringkasan Giro KlikBCA",
+            "label": "Ringkasan myBCA / KlikBCA",
             "saldo_awal": saldo_awal,
             "debet": mutasi_debit_summary if mutasi_debit_summary is not None else total_debet,
             "kredit": mutasi_kredit_summary if mutasi_kredit_summary is not None else total_kredit,
@@ -684,7 +883,11 @@ def process_bca(filepath, log_callback, progress_callback, success_callback, err
         from utils.bank_validator import detect_bank_from_file
         detected_bank, reason = detect_bank_from_file(filepath)
         if detected_bank and detected_bank != "BCA":
-            raise Exception(f"File ini terdeteksi sebagai dokumen mutasi BANK {detected_bank.upper()}, bukan BANK BCA ({reason}). Silakan ubah pilihan bank ke '{detected_bank}'.")
+            raise Exception(f"File ini terdeteksi sebagai dokumen mutasi Bank {detected_bank}, bukan Bank BCA ({reason}). Silakan ubah pilihan bank ke '{detected_bank}'.")
+
+        if filepath.lower().endswith(('.xlsx', '.xls')):
+            _process_bca_excel(filepath, log_callback, progress_callback, success_callback, error_callback)
+            return
 
         if filepath.lower().endswith('.csv'):
             _process_bca_csv(filepath, log_callback, progress_callback, success_callback, error_callback)

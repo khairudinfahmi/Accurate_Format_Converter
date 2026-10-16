@@ -73,3 +73,38 @@ def save_invalid_dates(invalid_data, source_file, log_callback=print):
     except Exception as e:
         log_callback(f"Gagal generate error file: {e}")
         return None
+
+def save_aol_json(filepath, account_number, opening_balance, closing_balance, mutation_list):
+    """
+    Menyimpan data hasil konversi ke dalam format JSON resmi Accurate Online (AOL)
+    sesuai standar pada templatehasilkonversi/sample-file-aol-format-json.json:
+    - accountNumber: str
+    - openingBalance: float
+    - closingBalance: float
+    - mutationList: list of dict(transDate, description, amount, balance)
+      di mana amount bernilai positif untuk Kredit (masuk) dan negatif untuk Debet (keluar).
+    """
+    import json
+    try:
+        payload = {
+            "accountNumber": str(account_number).strip(),
+            "openingBalance": round(float(opening_balance), 2),
+            "closingBalance": round(float(closing_balance), 2),
+            "mutationList": []
+        }
+
+        for item in mutation_list:
+            payload["mutationList"].append({
+                "transDate": str(item.get("transDate", "")).strip(),
+                "description": str(item.get("description", "")).strip(),
+                "amount": round(float(item.get("amount", 0.0)), 2),
+                "balance": round(float(item.get("balance", 0.0)), 2)
+            })
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=4, ensure_ascii=False)
+            f.write('\n')
+        return True
+    except Exception as e:
+        raise Exception(f"Gagal menyimpan format JSON AOL: {e}")
+

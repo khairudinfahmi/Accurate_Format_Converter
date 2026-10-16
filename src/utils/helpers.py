@@ -169,13 +169,13 @@ def format_audit_reconciliation_table(bank_name, source_metrics, output_metrics,
     diff_cnt_kre = abs(cnt_kre_out - cnt_kre_src)
     diff_cnt_tot = abs(cnt_tot_out - cnt_tot_src)
 
-    status_sa = "[COCOK / KLOP]" if (sa_src is None or diff_sa < 0.01) else f"[SELISIH: Rp {diff_sa:,.2f}]"
-    status_deb = "[COCOK / KLOP]" if diff_deb < 0.01 else f"[SELISIH: Rp {diff_deb:,.2f}]"
-    status_kre = "[COCOK / KLOP]" if diff_kre < 0.01 else f"[SELISIH: Rp {diff_kre:,.2f}]"
-    status_sk = "[COCOK / KLOP]" if (sk_src is None or diff_sk < 0.01) else f"[SELISIH: Rp {diff_sk:,.2f}]"
-    status_cnt_deb = "[COCOK / KLOP]" if diff_cnt_deb == 0 else f"[SELISIH: {diff_cnt_deb} BARIS]"
-    status_cnt_kre = "[COCOK / KLOP]" if diff_cnt_kre == 0 else f"[SELISIH: {diff_cnt_kre} BARIS]"
-    status_cnt_tot = "[COCOK / KLOP]" if diff_cnt_tot == 0 else f"[SELISIH: {diff_cnt_tot} BARIS]"
+    status_sa = "[Cocok / Klop]" if (sa_src is None or diff_sa < 0.01) else f"[Selisih: Rp {diff_sa:,.2f}]"
+    status_deb = "[Cocok / Klop]" if diff_deb < 0.01 else f"[Selisih: Rp {diff_deb:,.2f}]"
+    status_kre = "[Cocok / Klop]" if diff_kre < 0.01 else f"[Selisih: Rp {diff_kre:,.2f}]"
+    status_sk = "[Cocok / Klop]" if (sk_src is None or diff_sk < 0.01) else f"[Selisih: Rp {diff_sk:,.2f}]"
+    status_cnt_deb = "[Cocok / Klop]" if diff_cnt_deb == 0 else f"[Selisih: {diff_cnt_deb} baris]"
+    status_cnt_kre = "[Cocok / Klop]" if diff_cnt_kre == 0 else f"[Selisih: {diff_cnt_kre} baris]"
+    status_cnt_tot = "[Cocok / Klop]" if diff_cnt_tot == 0 else f"[Selisih: {diff_cnt_tot} baris]"
 
     def c_curr(v):
         return f"Rp {v:>15,.2f}" if v is not None else "(Dihitung Mundur)"
@@ -199,10 +199,12 @@ def format_audit_reconciliation_table(bank_name, source_metrics, output_metrics,
     border = "=" * line_w
     sep = "-" * line_w
 
-    title = f"LEMBAR REKONSILIASI MUTASI BANK DAN SALDO KAS ({bank_name.upper()})"
+    title = f"Lembar Rekonsiliasi Mutasi Bank dan Saldo Kas ({bank_name})"
+    subtitle = "(Pencocokan Integritas File Sumber Bank vs File Siap Impor Accurate)"
     lines = [
         border,
         f"{title:^{line_w}}",
+        f"{subtitle:^{line_w}}",
         border,
         header_row,
         sep,
@@ -215,8 +217,9 @@ def format_audit_reconciliation_table(bank_name, source_metrics, output_metrics,
         row("6. Total Transaksi Kredit", c_cnt(cnt_kre_src), c_cnt(cnt_kre_out), status_cnt_kre),
         row("7. Total Semua Mutasi", c_cnt(cnt_tot_src), c_cnt(cnt_tot_out), status_cnt_tot),
         sep,
-        f" PERSAMAAN SALDO KAS      : Saldo Awal ({sa_out:,.2f}) + Total Kredit ({kre_out:,.2f})",
+        f" Persamaan Saldo Kas      : Saldo Awal ({sa_out:,.2f}) + Total Kredit ({kre_out:,.2f})",
         f"                          - Total Debet ({deb_out:,.2f}) = Saldo Akhir ({sk_out:,.2f})",
+        f"                            (Sudut Pandang Bank: Kredit = Uang Masuk +, Debet = Uang Keluar -)",
     ]
 
     all_matched = (
@@ -224,16 +227,28 @@ def format_audit_reconciliation_table(bank_name, source_metrics, output_metrics,
         and diff_cnt_deb == 0 and diff_cnt_kre == 0 and diff_cnt_tot == 0
     )
     if all_matched:
-        lines.append(" STATUS KESELURUHAN       : [SEMUA MUTASI DAN SALDO 100% KLOP - TIDAK ADA SELISIH (Rp 0.00)]")
+        lines.append(" Status Keseluruhan       : [Semua mutasi dan saldo 100% klop - Tidak ada selisih (Rp 0.00)]")
     else:
-        lines.append(" STATUS KESELURUHAN       : [TERDAPAT PENYESUAIAN MUTASI - SILAKAN PERIKSA CATATAN DI BAWAH]")
+        lines.append(" Status Keseluruhan       : [Terdapat penyesuaian mutasi - Silakan periksa catatan di bawah]")
 
     if notes:
         lines.append(sep)
-        lines.append(" CATATAN PENYESUAIAN MUTASI:")
+        lines.append(" Catatan Penyesuaian Mutasi:")
         note_list = [notes] if isinstance(notes, str) else notes
         for note in note_list:
             lines.append(f" * {note}")
 
+    lines.append(sep)
+    lines.append(" Panduan Penting Konteks \"Klop\" & Rekomendasi Format:")
+    lines.append(" 1. Arti \"Klop\" Konversi File (Bukan Buku Besar Accurate):")
+    lines.append("    Status [Cocok / Klop] membuktikan file hasil konversi sudah 100% identik dengan file")
+    lines.append("    asli tarikan bank (tidak ada mutasi terlewat & nominal tidak rusak). Pencocokan jurnal")
+    lines.append("    akuntansi tetap dilakukan di menu Rekonsiliasi Bank Accurate Online setelah diimpor.")
+    lines.append(" 2. Sudut Pandang Rekening Koran Bank:")
+    lines.append("    Menggunakan standar bank: Kredit = Uang Masuk (+) dan Debet = Uang Keluar (-).")
+    lines.append("    Format ini sudah tepat untuk menu impor mutasi rekening koran (Smartlink) di Accurate.")
+    lines.append(" 3. Saran Format Paling Stabil (Sangat Disarankan):")
+    lines.append("    Gunakan Template 1 (Format JSON AOL) karena format JSON resmi Accurate Online ini")
+    lines.append("    paling stabil, baku, dan jarang berubah-ubah dibandingkan format laporan perbankan.")
     lines.append(border)
     return "\n".join(lines)

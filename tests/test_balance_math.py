@@ -9,7 +9,7 @@ import pandas as pd
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from processors.bca_processor import _reconcile_bca_transactions, _process_bca_csv
+from processors.bca_processor import _reconcile_bca_transactions, _process_bca_csv, process_bca
 from processors.panin_processor import process_panin, OUTPUT_COLUMNS
 from processors.panin_scan_processor import process_panin_scanned_pdf
 from utils.helpers import clean_currency, parse_date_tolerant
@@ -149,9 +149,9 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
                     self.assertTrue((d > 0 and k == 0) or (k > 0 and d == 0))
 
     def test_panin_sample_xls_file(self):
-        """Memverifikasi file sample Scanned Document (Template Excel Formatter).xls."""
+        """Memverifikasi file sample Scanned Document (Template AOL Format Excel (Non-JSON)).xls."""
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        p_xls = os.path.join(repo_root, "Scanned Document (Template Excel Formatter).xls")
+        p_xls = os.path.join(repo_root, "Scanned Document (Template AOL Format Excel (Non-JSON)).xls")
         if os.path.exists(p_xls):
             results = []
             def succ_cb(df, inv, dummy, fp):
@@ -257,8 +257,8 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
             self.assertEqual(float(row_sa[OUTPUT_COLUMNS['bal']]), 0.0)
             # Verifikasi audit_table disematkan ke df.attrs
             self.assertIn("audit_table", df.attrs)
-            self.assertIn("LEMBAR REKONSILIASI MUTASI BANK DAN SALDO KAS", df.attrs["audit_table"])
-            self.assertIn("TERDAPAT PENYESUAIAN MUTASI", df.attrs["audit_table"])
+            self.assertIn("Lembar Rekonsiliasi Mutasi Bank dan Saldo Kas", df.attrs["audit_table"])
+            self.assertIn("Terdapat penyesuaian mutasi", df.attrs["audit_table"])
         finally:
             if os.path.exists(f_path):
                 os.remove(f_path)
@@ -289,8 +289,8 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
             "count": 10
         }
         table_str = format_audit_reconciliation_table("BCA", src_metrics, out_metrics, notes="Semua cocok.")
-        self.assertIn("[COCOK / KLOP]", table_str)
-        self.assertIn("SEMUA MUTASI DAN SALDO 100% KLOP", table_str)
+        self.assertIn("[Cocok / Klop]", table_str)
+        self.assertIn("Semua mutasi dan saldo 100% klop", table_str)
         self.assertIn("Total Transaksi Debet", table_str)
         self.assertIn("Total Transaksi Kredit", table_str)
         self.assertIn("Semua cocok.", table_str)
@@ -305,8 +305,182 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
         # Test 3: Terdeteksi delta selisih
         src_diff = dict(src_metrics, debet=200000.0)
         table_diff = format_audit_reconciliation_table("BCA", src_diff, out_metrics)
-        self.assertIn("SELISIH: Rp 50,000.00", table_diff)
-        self.assertIn("TERDAPAT PENYESUAIAN MUTASI", table_diff)
+        self.assertIn("Selisih: Rp 50,000.00", table_diff)
+        self.assertIn("Terdapat penyesuaian mutasi", table_diff)
+
+    def test_save_aol_json_schema_compliance(self):
+        """Verifikasi bahwa output save_aol_json 100% mematuhi struktur sample-file-aol-format-json.json"""
+        import json
+        from utils.file_exporter import save_aol_json
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        official_sample_path = os.path.join(repo_root, "templatehasilkonversi", "sample-file-aol-format-json.json")
+        
+        with open(official_sample_path, "r", encoding="utf-8") as f:
+            official_data = json.load(f)
+
+        # Kunci root kanonikal
+        expected_root_keys = set(official_data.keys())
+        expected_item_keys = set(official_data["mutationList"][0].keys())
+
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as tf:
+            test_json_path = tf.name
+
+        try:
+            mutations = [
+                {"transDate": "10/01/2026", "description": "SETORAN CUSTOMER A", "amount": 2500000.0, "balance": 12500000.0},
+                {"transDate": "12/01/2026", "description": "BAYAR LISTRIK & AIR", "amount": -750000.0, "balance": 11750000.0},
+                {"transDate": "15/01/2026", "description": "BIAYA ADMIN BANK", "amount": -15000.0, "balance": 11735000.0}
+            ]
+            save_aol_json(test_json_path, "07101999", 10000000.0, 11735000.0, mutations)
+
+            with open(test_json_path, "r", encoding="utf-8") as f:
+                generated_data = json.load(f)
+
+            # 1. Verifikasi kunci root
+            self.assertEqual(set(generated_data.keys()), expected_root_keys)
+            self.assertEqual(generated_data["accountNumber"], "07101999")
+            self.assertEqual(generated_data["openingBalance"], 10000000.0)
+            self.assertEqual(generated_data["closingBalance"], 11735000.0)
+            self.assertEqual(len(generated_data["mutationList"]), 3)
+
+            # 2. Verifikasi kunci item mutasi
+            for item in generated_data["mutationList"]:
+                self.assertEqual(set(item.keys()), expected_item_keys)
+                self.assertIsInstance(item["transDate"], str)
+                self.assertIsInstance(item["description"], str)
+                self.assertIsInstance(item["amount"], (int, float))
+                self.assertIsInstance(item["balance"], (int, float))
+
+            # 3. Verifikasi tanda: Debet harus negatif, Kredit harus positif
+            self.assertGreater(generated_data["mutationList"][0]["amount"], 0)
+            self.assertLess(generated_data["mutationList"][1]["amount"], 0)
+            self.assertLess(generated_data["mutationList"][2]["amount"], 0)
+
+            # 4. Verifikasi persamaan saldo kas Accurate Online
+            calculated_closing = generated_data["openingBalance"] + sum(m["amount"] for m in generated_data["mutationList"])
+            self.assertAlmostEqual(calculated_closing, generated_data["closingBalance"], places=2)
+
+        finally:
+            if os.path.exists(test_json_path):
+                os.remove(test_json_path)
+
+    def test_bca_and_panin_json_integration(self):
+        """Verifikasi bahwa transaksi hasil processor BCA dan Panin dapat diekspor ke format JSON AOL dengan matematis klop."""
+        import json
+        from utils.file_exporter import save_aol_json
+
+        # 1. BCA Dataset
+        txs = [
+            {"tanggal": "'05/01", "keterangan": "SETORAN TUNAI", "cabang": "'0000", "mutasi": 2000000.0, "tipe": "CR", "saldo": 7000000.0},
+            {"tanggal": "'06/01", "keterangan": "TARIKAN ATM", "cabang": "'0000", "mutasi": 800000.0, "tipe": "DB", "saldo": 6200000.0}
+        ]
+        bca_mutations = []
+        for tx in txs:
+            mut = float(tx["mutasi"])
+            amt = mut if tx["tipe"] == "CR" else -mut
+            bca_mutations.append({
+                "transDate": "05/01/2026",
+                "description": str(tx["keterangan"]),
+                "amount": amt,
+                "balance": float(tx["saldo"])
+            })
+
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as tf:
+            bca_json_path = tf.name
+
+        try:
+            save_aol_json(bca_json_path, "1234567890", 5000000.0, 6200000.0, bca_mutations)
+            with open(bca_json_path, "r", encoding="utf-8") as f:
+                res = json.load(f)
+            self.assertEqual(res["accountNumber"], "1234567890")
+            self.assertEqual(res["openingBalance"], 5000000.0)
+            self.assertEqual(res["closingBalance"], 6200000.0)
+            self.assertEqual(len(res["mutationList"]), 2)
+            self.assertEqual(res["mutationList"][0]["amount"], 2000000.0)
+            self.assertEqual(res["mutationList"][1]["amount"], -800000.0)
+            self.assertEqual(res["openingBalance"] + sum(m["amount"] for m in res["mutationList"]), 6200000.0)
+        finally:
+            if os.path.exists(bca_json_path):
+                os.remove(bca_json_path)
+
+    def test_all_10_real_bank_mutation_files(self):
+        """Uji ekstensif: 10/10 file asli di folder filemutasiaslibankasli/ harus 100% lulus konversi, 
+        selisih Rp 0.00, dan kompatibel diekspor ke schema Accurate Online (AOL) JSON."""
+        import glob
+        from utils.file_exporter import save_aol_json
+        import json
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        folder_path = os.path.join(repo_root, "filemutasiaslibankasli")
+        files = sorted(glob.glob(os.path.join(folder_path, "*")))
+
+        self.assertEqual(len(files), 10, f"Diharapkan 10 file mutasi asli di {folder_path}, ditemukan {len(files)}")
+
+        for fpath in files:
+            fname = os.path.basename(fpath)
+            with self.subTest(file=fname):
+                results = []
+                errors = []
+
+                def on_success(txs, rek, nm, sa, sak, fp):
+                    results.append((txs, rek, nm, sa, sak))
+
+                def on_error(err):
+                    errors.append(err)
+
+                process_bca(
+                    filepath=fpath,
+                    log_callback=lambda m: None,
+                    progress_callback=lambda p: None,
+                    success_callback=on_success,
+                    error_callback=on_error
+                )
+
+                self.assertEqual(len(errors), 0, f"Error saat memproses {fname}: {errors}")
+                self.assertEqual(len(results), 1, f"Hasil proses kosong untuk {fname}")
+
+                txs, rek, nm, saldo_awal, saldo_akhir = results[0]
+                self.assertGreater(len(txs), 0, f"Tidak ada transaksi ditemukan di {fname}")
+
+                # 1. Verifikasi Checksum Saldo Kas (Diff harus Rp 0.00)
+                calculated_sk = saldo_awal + sum(t["mutasi"] if t["tipe"] == "CR" else -t["mutasi"] for t in txs)
+                diff = round(calculated_sk - saldo_akhir, 2)
+                self.assertEqual(diff, 0.0, f"Selisih saldo kas tidak Rp 0.00 pada {fname}: SA={saldo_awal}, SK={saldo_akhir}, Calc={calculated_sk}, Diff={diff}")
+
+                # 2. Verifikasi Ekspor AOL JSON
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as tf:
+                    temp_json = tf.name
+
+                try:
+                    mutations = []
+                    for t in txs:
+                        tgl_clean = t["tanggal"].replace("'", "").strip()
+                        mut = float(t["mutasi"])
+                        amt = mut if t["tipe"] == "CR" else -mut
+                        mutations.append({
+                            "transDate": tgl_clean,
+                            "description": str(t["keterangan"]),
+                            "amount": amt,
+                            "balance": float(t["saldo"])
+                        })
+
+                    save_aol_json(temp_json, rek, saldo_awal, saldo_akhir, mutations)
+                    with open(temp_json, 'r', encoding='utf-8') as jf:
+                        aol_data = json.load(jf)
+
+                    self.assertEqual(aol_data["accountNumber"], rek)
+                    self.assertEqual(aol_data["openingBalance"], saldo_awal)
+                    self.assertEqual(aol_data["closingBalance"], saldo_akhir)
+                    self.assertEqual(len(aol_data["mutationList"]), len(txs))
+
+                    calc_aol = aol_data["openingBalance"] + sum(m["amount"] for m in aol_data["mutationList"])
+                    self.assertAlmostEqual(calc_aol, aol_data["closingBalance"], places=2)
+                finally:
+                    if os.path.exists(temp_json):
+                        os.remove(temp_json)
 
 if __name__ == '__main__':
     unittest.main()
+
+

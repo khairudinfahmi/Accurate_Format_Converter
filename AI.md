@@ -20,22 +20,25 @@ Aplikasi ini memiliki arsitektur 2-lapis (2-Tier) dengan model distribusi **Shar
 ---
 
 ## 2. ATURAN MUTLAK: STRUKTUR OUTPUT (FORMAT_SPEC)
-Aplikasi ini ditujukan untuk mengimpor data ke **Accurate Online**. Format output (baik XLS maupun CSV) **HARUS EXACTLY 5 KOLOM** dengan urutan dan nama header baku:
+Aplikasi ini ditujukan untuk mengimpor data ke **Accurate Online**. Format output spreadsheet (baik XLS maupun CSV) **HARUS EXACTLY 5 KOLOM** dengan urutan dan nama header baku:
 1.  `tanggal` (Format `DD/MM/YYYY`)
 2.  `transaksi` (String/teks keterangan)
 3.  `debet` (Angka murni/float, 0 jika kosong)
 4.  `kredit` (Angka murni/float, 0 jika kosong)
 5.  `Saldo` (Angka murni/float)
 
+Sebagai pelengkap stabil, aplikasi kini juga menghasilkan format resmi **JSON Accurate Online (AOL)** (`accountNumber`, `openingBalance`, `closingBalance`, `mutationList`) sesuai skema baku AOL.
+
 **Pantangan Output:**
 *   Tidak boleh ada teks kosong `""` atau `"NaN"` pada kolom `tanggal`.
 *   Semua simbol mata uang `Rp`, `,`, dan `.` ribuan harus bersih.
+
 
 ---
 
 ## 3. ATURAN MUTLAK: PARSING BCA (`bca_processor.py`)
 BCA memiliki format PDF yang kompleks, serta mendukung input CSV (seperti ekspor KlikBCA). 
-PENTING: BCA menghasilkan **3 file output sekaligus** (CSV Accurate, XLS Formatter, dan KlikBCA CSV).
+PENTING: BCA menghasilkan **4 file output sekaligus** (1 - Template AOL Format JSON [Paling Direkomendasikan], 2 - Template AOL Format Excel (Non-JSON), 3 - Template Rekening Tahapan CSV, dan 4 - Template Rekening Giro CSV).
 Untuk input PDF, AI tidak boleh merusak sistem prioritas (3-Phase) berikut:
 
 1.  **Sistem Koordinat (X0):**

@@ -10,10 +10,11 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from PIL import Image
+import pandas as pd
 
 from utils.config_manager import load_config, save_config
 from utils.helpers import get_windows_theme, resource_path
-from utils.file_exporter import save_exact_xls, save_invalid_dates
+from utils.file_exporter import save_exact_xls, save_invalid_dates, save_aol_json
 from utils.bank_validator import validate_bank_selection, detect_bank_from_file
 from processors.panin_processor import process_panin, OUTPUT_COLUMNS
 from processors.bca_processor import process_bca
@@ -21,7 +22,7 @@ from processors.bca_processor import process_bca
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        version_str = "4.5.3"
+        version_str = "5.0.0"
         try:
             exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             v_path = os.path.join(exe_dir, "version.txt")
@@ -223,7 +224,7 @@ class UniversalAccurateConverter:
 
         self.path_var = tk.StringVar()
         self.entry_path = ctk.CTkEntry(file_frame, textvariable=self.path_var, width=600, height=45,
-                                       placeholder_text="Pilih file mutasi (Panin: .xls/.xlsx/.csv/.pdf | BCA: .pdf/.csv)...", 
+                                       placeholder_text="Pilih file mutasi (Panin: .xls/.xlsx/.csv/.pdf | BCA: .pdf/.csv/.xlsx/.xls)...",
                                        font=ctk.CTkFont(family="Inter", size=13),
                                        border_color=("#E5E9F2", "#4A5568"), border_width=2,
                                        fg_color=("#F9FAFB", "#2D3748"), corner_radius=10)
@@ -314,15 +315,15 @@ class UniversalAccurateConverter:
             if detected:
                 current_bank = self.bank_var.get()
                 if detected.lower() != current_bank.lower():
-                    self.log(f"[PERINGATAN] File ini terdeteksi sebagai mutasi BANK {detected.upper()}! Pilihan menu saat ini adalah '{current_bank}'. Pastikan ubah pilihan bank sebelum proses.")
+                    self.log(f"[Peringatan] File ini terdeteksi sebagai mutasi Bank {detected}! Pilihan menu saat ini adalah '{current_bank}'. Pastikan ubah pilihan bank sebelum proses.")
                 else:
-                    self.log(f"[INFO] {desc} ({detected}).")
+                    self.log(f"[Info] {desc} ({detected}).")
 
     def show_copyable_dialog(self, title, message, path_to_copy=""):
         dialog = ctk.CTkToplevel(self.root)
         dialog.title(title)
         
-        has_table = "LEMBAR REKONSILIASI" in message or "LEMBAR AUDIT REKONSILIASI" in message or "=====" in message
+        has_table = "lembar rekonsiliasi" in message.lower() or "=====" in message
         if has_table:
             dialog.geometry("860x580")
             font_choice = ("Consolas", 11)
@@ -441,8 +442,8 @@ class UniversalAccurateConverter:
                 error_callback=handle_error
             )
         elif bank == "BCA":
-            if not (filepath.lower().endswith('.pdf') or filepath.lower().endswith('.csv')):
-                handle_error("Format file tidak valid. Mutasi BCA harus dalam format PDF atau CSV.")
+            if not (filepath.lower().endswith('.pdf') or filepath.lower().endswith('.csv') or filepath.lower().endswith('.xlsx') or filepath.lower().endswith('.xls')):
+                handle_error("Format file tidak valid. Mutasi BCA harus dalam format PDF, CSV, atau Excel (.xlsx/.xls).")
                 return
             process_bca(
                 filepath=filepath,
@@ -470,7 +471,7 @@ class UniversalAccurateConverter:
 
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:panin[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
-            default_name = f"{base_name} (Template Excel Formatter).xls"
+            default_name = f"{base_name} (Template AOL Format Excel (Non-JSON)).xls"
             save_path = filedialog.asksaveasfilename(
                 defaultextension=".xls", 
                 filetypes=[("Excel 97-2003", "*.xls")], 
@@ -485,17 +486,58 @@ class UniversalAccurateConverter:
                     self.update_progress(1.0)
                     self.log(f"[OK] Saved: {os.path.basename(save_path)}")
                     
+                    # === TAMBAHAN: Simpan format JSON AOL ===
+                    json_base = os.path.splitext(save_path)[0]
+                    if "(Template AOL Format Excel (Non-JSON))" in json_base:
+                        json_path = json_base.replace("(Template AOL Format Excel (Non-JSON))", "(Template AOL Format JSON)") + ".json"
+                    else:
+                        json_path = f"{json_base} (Template AOL Format JSON).json"
+
+                    # Ekstrak nomor rekening fallback Panin
+                    rek_panin = getattr(df_output, 'attrs', {}).get("account_number")
+                    if not rek_panin:
+                        rek_match = re.search(r'\b(\d{8,16})\b', os.path.basename(filepath))
+                        rek_panin = rek_match.group(1) if rek_match else "0000000000"
+
+                    saldo_awal_panin = float(df_output.iloc[num_dummy][OUTPUT_COLUMNS['bal']])
+                    saldo_akhir_panin = float(df_output.iloc[-1][OUTPUT_COLUMNS['bal']])
+
+                    df_tx = df_output.iloc[num_dummy + 1 : len(df_output) - 2]
+                    panin_mutation_list = []
+                    for _, r in df_tx.iterrows():
+                        t_date = str(r[OUTPUT_COLUMNS['tgl']]).strip()
+                        desc = str(r[OUTPUT_COLUMNS['desc']]).strip()
+                        deb_str = r[OUTPUT_COLUMNS['deb']]
+                        kre_str = r[OUTPUT_COLUMNS['kre']]
+                        d_val = float(deb_str) if pd.notna(deb_str) and deb_str not in ("", None) else 0.0
+                        k_val = float(kre_str) if pd.notna(kre_str) and kre_str not in ("", None) else 0.0
+                        amt = k_val if k_val > 0 else -d_val
+                        b_val = float(r[OUTPUT_COLUMNS['bal']]) if pd.notna(r[OUTPUT_COLUMNS['bal']]) and r[OUTPUT_COLUMNS['bal']] not in ("", None) else 0.0
+                        panin_mutation_list.append({
+                            "transDate": t_date,
+                            "description": desc,
+                            "amount": amt,
+                            "balance": b_val
+                        })
+
+                    try:
+                        save_aol_json(json_path, rek_panin, saldo_awal_panin, saldo_akhir_panin, panin_mutation_list)
+                        self.log(f"[OK] Panin Template AOL Format JSON Saved: {os.path.basename(json_path)}")
+                    except Exception as json_err:
+                        self.log(f"[WARN] Gagal simpan JSON Panin: {json_err}")
+
                     audit_table = getattr(df_output, 'attrs', {}).get("audit_table", "")
+                    rekomendasi_txt = "\nSaran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi ini paling stabil dan tidak terpengaruh perubahan format dari pihak bank."
                     if invalid_dates_data:
                         error_file = save_invalid_dates(invalid_dates_data, filepath, log_callback=self.log)
-                        msg = f"File berhasil disimpan!\nLokasi:\n{save_path}\n\nValid: {len(df_output) - 3 - num_dummy} baris\nDummy: {num_dummy} baris\nInvalid Date: {len(invalid_dates_data)} baris (diabaikan)"
+                        msg = f"Dua berkas berhasil disimpan:\n1. Template AOL Format JSON: {os.path.basename(json_path)} [Paling Direkomendasikan]\n2. Template AOL Format Excel (Non-JSON): {os.path.basename(save_path)}\n\nValid: {len(df_tx)} baris | Dummy: {num_dummy} baris\nInvalid Date: {len(invalid_dates_data)} baris (diabaikan){rekomendasi_txt}"
                         if error_file:
                             msg += f"\nFile error saved: {os.path.basename(error_file)}"
                         if audit_table:
                             msg += f"\n\n{audit_table}"
                         self.show_copyable_dialog("Selesai dengan Peringatan", msg, path_to_copy=save_path)
                     else:
-                        msg = f"File berhasil disimpan!\nLokasi:\n{save_path}\n\nValid: {len(df_output) - 3 - num_dummy} baris\nDummy: {num_dummy} baris"
+                        msg = f"Dua berkas berhasil disimpan:\n1. Template AOL Format JSON: {os.path.basename(json_path)} [Paling Direkomendasikan]\n2. Template AOL Format Excel (Non-JSON): {os.path.basename(save_path)}\n\nValid: {len(df_tx)} baris | Dummy: {num_dummy} baris{rekomendasi_txt}"
                         if audit_table:
                             msg += f"\n\n{audit_table}"
                         self.show_copyable_dialog("Selesai", msg, path_to_copy=save_path)
@@ -514,7 +556,7 @@ class UniversalAccurateConverter:
         try:
             messagebox.showinfo(
                 "Ekstraksi BCA Berhasil", 
-                f"Ekstraksi {len(transactions)} transaksi BCA berhasil!\n\nSistem akan menyimpan TIGA file (Rekening Tahapan, Excel Formatter, Rekening Giro) ke dalam SATU FOLDER khusus agar rapi.\n\nSilakan tentukan nama folder penyimpanan."
+                f"Ekstraksi {len(transactions)} data transaksi BCA berhasil.\n\nSistem akan menyimpan 4 berkas hasil konversi ke dalam satu folder khusus.\n\nSilakan tentukan nama dan lokasi folder penyimpanan."
             )
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:bca[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
@@ -536,10 +578,11 @@ class UniversalAccurateConverter:
                 target_dir = os.path.join(parent_dir, folder_name)
                 os.makedirs(target_dir, exist_ok=True)
                 
-                # Definisikan 3 path file baru
-                save_path = os.path.join(target_dir, f"{chosen_basename} (1 - Template Rekening Tahapan).csv")
-                backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Template Excel Formatter).xls")
-                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (3 - Template Rekening Giro).csv")
+                # Definisikan 4 path file baru dengan urutan resmi
+                aol_json_path = os.path.join(target_dir, f"{chosen_basename} (1 - Template AOL Format JSON).json")
+                backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Template AOL Format Excel (Non-JSON)).xls")
+                save_path = os.path.join(target_dir, f"{chosen_basename} (3 - Template Rekening Tahapan).csv")
+                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (4 - Template Rekening Giro).csv")
                 # === PRIMARY: Save CSV (for Accurate import) ===
                 with open(save_path, 'w', newline='', encoding='utf-8') as f:
                     writer = csv.writer(f, lineterminator='\n')
@@ -626,10 +669,10 @@ class UniversalAccurateConverter:
                 
                 df_output = pd.concat([df_dummy, row_saldo_awal, df_final, row_total_mutasi, row_saldo_akhir], ignore_index=True)
 
-                # backup_path sudah didefinisikan di atas (sebagai Excel Formatter)
+                # backup_path sudah didefinisikan di atas (sebagai Template AOL Format Excel (Non-JSON))
                 save_exact_xls(df_output, backup_path, num_dummy, columns=cols)
                 
-                # === FORMAT 3: KlikBCA CSV ===
+                # === FORMAT 4 (File CSV): CSV Rekening Giro (myBCA / KlikBCA) ===
                 # klikbca_path sudah didefinisikan di atas
                 
                 with open(klikbca_path, 'w', newline='', encoding='utf-8') as f:
@@ -691,12 +734,35 @@ class UniversalAccurateConverter:
                     writer3.writerow([f"Saldo Akhir : {saldo_akhir:,.2f}"])
                     f.write('\n')  # 1 baris kosong penutup (writerow sudah menambahkan \n)
 
+                # === FORMAT 4: Accurate Online (AOL) JSON ===
+                bca_mutation_list = []
+                for tx in transactions:
+                    tgl_clean = format_bca_ddmmyyyy(tx["tanggal"], effective_year)
+                    mut = float(tx["mutasi"])
+                    amt = mut if tx["tipe"] == "CR" else -mut
+                    bca_mutation_list.append({
+                        "transDate": tgl_clean,
+                        "description": tx["keterangan"],
+                        "amount": amt,
+                        "balance": float(tx["saldo"])
+                    })
+                save_aol_json(aol_json_path, rekening, saldo_awal, saldo_akhir, bca_mutation_list)
+
                 self.update_progress(1.0)
-                self.log(f"[OK] BCA CSV Saved: {os.path.basename(save_path)}")
-                self.log(f"[OK] BCA Excel Formatter Saved: {os.path.basename(backup_path)}")
-                self.log(f"[OK] BCA KlikBCA CSV Saved: {os.path.basename(klikbca_path)}")
+                self.log(f"[OK] BCA Template AOL Format JSON: {os.path.basename(aol_json_path)}")
+                self.log(f"[OK] BCA Template AOL Format Excel (Non-JSON): {os.path.basename(backup_path)}")
+                self.log(f"[OK] BCA Template Rekening Tahapan: {os.path.basename(save_path)}")
+                self.log(f"[OK] BCA Template Rekening Giro: {os.path.basename(klikbca_path)}")
                 audit_table = transactions[0].get("_audit_table", "") if transactions else ""
-                msg = f"Tiga File BCA berhasil disimpan dalam folder:\n{target_dir}\n\n1. Template Rekening Tahapan\n2. Template Excel Formatter\n3. Template Rekening Giro\n\nTotal Data: {len(transactions)} baris"
+                msg = (
+                    f"Empat berkas hasil konversi BCA berhasil disimpan dalam folder:\n{target_dir}\n\n"
+                    f"1. Template AOL Format JSON (.json)  [Paling Direkomendasikan]\n"
+                    f"2. Template AOL Format Excel (Non-JSON) (.xls)\n"
+                    f"3. Template Rekening Tahapan (.csv)\n"
+                    f"4. Template Rekening Giro (myBCA / KlikBCA) (.csv)\n\n"
+                    f"Total Data: {len(transactions)} baris mutasi\n\n"
+                    f"Saran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi Accurate ini paling stabil, baku, dan jarang terpengaruh perubahan tata letak dari pihak bank."
+                )
                 if audit_table:
                     msg += f"\n\n{audit_table}"
                 self.show_copyable_dialog("Selesai BCA", msg, path_to_copy=target_dir)

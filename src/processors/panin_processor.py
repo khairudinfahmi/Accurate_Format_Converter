@@ -27,7 +27,7 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
         from utils.bank_validator import detect_bank_from_file
         detected_bank, reason = detect_bank_from_file(filepath)
         if detected_bank and detected_bank != "Panin":
-            raise Exception(f"File ini terdeteksi sebagai dokumen mutasi BANK {detected_bank.upper()}, bukan BANK PANIN ({reason}). Silakan ubah pilihan bank ke '{detected_bank}'.")
+            raise Exception(f"File ini terdeteksi sebagai dokumen mutasi Bank {detected_bank}, bukan Bank Panin ({reason}). Silakan ubah pilihan bank ke '{detected_bank}'.")
         
         df_temp = None
         file_ext = filepath.lower()
