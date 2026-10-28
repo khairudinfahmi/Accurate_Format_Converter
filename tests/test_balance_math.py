@@ -415,6 +415,9 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
         folder_path = os.path.join(repo_root, "filemutasiaslibankasli")
         files = sorted(glob.glob(os.path.join(folder_path, "*")))
 
+        if not os.path.exists(folder_path) or not files:
+            self.skipTest(f"Direktori uji mutasi bank asli {folder_path} tidak ditemukan")
+
         self.assertEqual(len(files), 10, f"Diharapkan 10 file mutasi asli di {folder_path}, ditemukan {len(files)}")
 
         for fpath in files:
@@ -479,6 +482,47 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
                 finally:
                     if os.path.exists(temp_json):
                         os.remove(temp_json)
+
+    def test_bca_multipage_tahapan_glenn_pdf(self):
+        """Verifikasi bahwa file BCA Tahapan multi-halaman (23 halaman, 253 transaksi) 100% klop Rp 0.00 dan bebas header/footer bleed"""
+        from processors.bca_processor import process_bca
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sample_pdf = os.path.join(repo_root, "sample", "BCA_GLENN GERRY UMBOH_BALI.pdf")
+        if not os.path.exists(sample_pdf):
+            self.skipTest("Berkas sample BCA_GLENN GERRY UMBOH_BALI.pdf tidak ditemukan")
+
+        results = []
+        errors = []
+        process_bca(
+            sample_pdf,
+            log_callback=lambda m: None,
+            progress_callback=lambda p: None,
+            success_callback=lambda txs, rek, nm, sa, sak, fp: results.append((txs, rek, nm, sa, sak)),
+            error_callback=lambda e: errors.append(e)
+        )
+
+        self.assertEqual(len(errors), 0, f"Error saat memproses sample BCA Tahapan: {errors}")
+        self.assertEqual(len(results), 1)
+        txs, rek, nm, sa, sak = results[0]
+
+        self.assertEqual(len(txs), 253)
+        self.assertEqual(sa, 0.0)
+        self.assertEqual(sak, 13605852.98)
+
+        total_deb = sum(t["mutasi"] for t in txs if t["tipe"] == "DB")
+        total_kre = sum(t["mutasi"] for t in txs if t["tipe"] == "CR")
+        self.assertEqual(round(total_deb, 2), 350553211.99)
+        self.assertEqual(round(total_kre, 2), 364159064.97)
+
+        calc_sk = sa + sum(t["mutasi"] if t["tipe"] == "CR" else -t["mutasi"] for t in txs)
+        self.assertEqual(round(calc_sk - sak, 2), 0.0)
+
+        # Pastikan transaksi terakhir adalah Pajak Bunga dengan nominal benar (612.99, bukan 33.0)
+        last_tx = txs[-1]
+        self.assertIn("PAJAK BUNGA", last_tx["keterangan"].upper())
+        self.assertEqual(last_tx["mutasi"], 612.99)
+        self.assertEqual(last_tx["tipe"], "DB")
 
     def test_pend_date_resolution_and_clean_desc(self):
         """Verifikasi bahwa file TRIA CSV dengan status 'PEND' otomatis diselesaikan menjadi tanggal valid 15/10/2026 dan deskripsi dibersihkan"""

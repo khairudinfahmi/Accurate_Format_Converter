@@ -885,7 +885,12 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
                     continue
                     
                 if "TANGGAL KETERANGAN CBG MUTASI SALDO" in text_line.upper(): continue
-                if "MUTASI CR :" in text_line.upper() and "SALDO AKHIR :" in text_line.upper(): continue
+                if "MUTASI CR :" in text_line.upper() or "MUTASI DB :" in text_line.upper() or "SALDO AKHIR :" in text_line.upper(): continue
+                # Filter baris header berulang pada halaman 2+
+                if "REKENING TAHAPAN" in text_line.upper() or "NO. REKENING" in text_line.upper() or "NOMOR REKENING" in text_line.upper(): continue
+                if "HALAMAN :" in text_line.upper() or "PERIODE :" in text_line.upper() or "MATA UANG :" in text_line.upper(): continue
+                if "CATATAN:" in text_line.upper() or "APABILA NASABAH" in text_line.upper() or "BCA BERHAK" in text_line.upper(): continue
+                if "TELAH MENYETUJUI" in text_line.upper(): continue
                 if "Bersambung ke " in text_line: continue
                 
                 all_lines.append(line)
