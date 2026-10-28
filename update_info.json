@@ -1,5 +1,5 @@
 {
   "latest_version": "5.0.1",
-  "download_url": "https://www.dropbox.com/scl/fi/ch2pio3k09rga0egaydya/Accurate_Converter_Setup_v5.0.0.exe?rlkey=m785v6t7i87493db08e019kl7&st=rw0jdt7o&dl=1&ext=.exe",
+  "download_url": "https://www.dropbox.com/scl/fi/vuhydy4hcfrawxemqhn7w/Accurate_Converter_Setup_v5.0.1.exe?rlkey=r322fb71cjmuvdc6ayznvg4ci&st=1zyqbsli&dl=1&ext=.exe",
   "release_notes": "Pembaruan v5.0.1:\n- Perbaikan Kritis BCA Tahapan Multi-Halaman: Menyempurnakan filter header dan footer berulang pada dokumen PDF BCA Tahapan multi-halaman sehingga nominal mutasi dan saldo kas 100% klop tanpa risiko tertimpa teks kop dokumen.\n- Peningkatan Keandalan Validasi: Integrasi pengujian matematis berkelanjutan untuk seluruh varian mutasi rekening koran."
 }
