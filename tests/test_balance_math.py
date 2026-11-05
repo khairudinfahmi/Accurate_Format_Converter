@@ -631,6 +631,17 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
         self.assertIn("RENSAWALLPAPERSAMA TGH:", c5)
         self.assertIn(".00 ADM:", c5)
 
+        # SWITCHING & BI-FAST general prefix
+        c6 = clean_bca_description("SWITCHING CR DR 002 AI SUAIDAH /NEW BRI MOB")
+        self.assertTrue(c6.startswith("SWITCHING CR - DR 002"))
+
+        c7 = clean_bca_description("BI-FAST CR DR 008 RIZKY SETIAWAN")
+        self.assertTrue(c7.startswith("BI-FAST CR - DR 008"))
+
+        # WS terminal sticking to amount
+        c8 = clean_bca_description("TRSF E-BANKING CR 2909/FTSCY/WS950311250000.00 ADE TUHALIZA")
+        self.assertIn("WS95031 1250000.00", c8)
+
     def test_bca_reconciler_same_day_out_of_order_chain(self):
         """Verifikasi pemulihan urutan kronologis otomatis pada kasus selisih 30 September 2026."""
         s0 = 235123583.0

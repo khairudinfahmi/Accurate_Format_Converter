@@ -24,15 +24,22 @@ def clean_bca_description(desc):
     s = re.sub(r'^(BI-FAST\s+(?:CR|DB))(?!\s*-)\s*TRANSFER\b', r'\1 - BIF TRANSFER', s)
     s = re.sub(r'^(BI-FAST\s+(?:CR|DB))(?!\s*-)\s*BIAYA\s+TXN\b', r'\1 - BIF BIAYA TXN', s)
     s = re.sub(r'^(BI-FAST\s+(?:CR|DB))(?!\s*-)\s*BIF\b', r'\1 - BIF', s)
+    s = re.sub(r'^(BI-FAST\s+(?:CR|DB))(?!\s*-)\s*', r'\1 - ', s)
+    s = re.sub(r'^(SWITCHING\s+(?:CR|DB))(?!\s*-)\s*', r'\1 - ', s)
+    s = re.sub(r'^(POLL\s+ADV\s+(?:CR|DB))(?!\s*-)\s*', r'\1 - ', s)
+    s = re.sub(r'^(SETORAN\s+TUNAI)(?!\s*-)\s*', r'\1 - ', s)
+    s = re.sub(r'^(TARIKAN\s+(?:TUNAI|ATM))(?!\s*-)\s*', r'\1 - ', s)
     
     # 2. QRIS (KR OTOMATIS) & KARTU KREDIT (EDC)
     s = re.sub(r'^KR\s+OTOMATIS\s+TANGGAL\s*:\s*\d{2}/\d{2}\s+', r'KR OTOMATIS - ', s)
     s = re.sub(r'^KR\s+OTOMATIS(?!\s*-)\s+MID', r'KR OTOMATIS - MID', s)
     s = re.sub(r'^KARTU\s+KREDIT(?!\s*-)\s+MID', r'KARTU KREDIT - MID', s)
     
-    # 3. Pisahkan kode terminal WSID / WS yang menempel dengan kode VA / nomor
+    # 3. Pisahkan kode terminal WSID / WS yang menempel dengan kode VA / nomor / nominal / nama
     s = re.sub(r'(WS\d{5})(\d{4,}/)', r'\1 \2', s)
     s = re.sub(r'(WS\d{5})([A-Z]{3,}\d+)', r'\1 \2', s)
+    s = re.sub(r'(WS\d{5})(\d+\.\d{2})', r'\1 \2', s)
+    s = re.sub(r'(WS\d{5})([A-Za-z])', r'\1 \2', s)
     
     # 4. Pisahkan angka/kata yang menempel akibat fixed-width field KlikBCA
     s = re.sub(r'(MID\s*:\s*\d+)([A-Za-z])', r'\1 \2', s)
