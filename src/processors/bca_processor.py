@@ -870,6 +870,15 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
             
         if not transactions:
             raise Exception("File PDF berhasil dibaca, namun tidak ditemukan transaksi mutasi BCA Giro yang valid.")
+
+        # Selesaikan tanggal transaksi PEND (jika ada) ke format DD/MM/YYYY
+        pend_found = any("PEND" in str(tx.get("tanggal", "")).upper() for tx in transactions)
+        if pend_found:
+            resolved_pend = resolve_pend_date(transactions, effective_year=None, metadata_period=periode_raw, filename=os.path.basename(filepath))
+            log_callback(f"[INFO] Tanggal transaksi PEND diselesaikan menjadi tanggal valid: {resolved_pend}")
+            for tx in transactions:
+                if "PEND" in str(tx.get("tanggal", "")).upper():
+                    tx["tanggal"] = "'" + resolved_pend
             
         if saldo_awal is None:
             first_tx = transactions[0]
@@ -1133,6 +1142,15 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
                 "tipe": tipe,
                 "saldo_printed": saldo_pr
             })
+
+        # Selesaikan tanggal transaksi PEND (jika ada) ke format DD/MM/YYYY
+        pend_found = any("PEND" in str(tx.get("tanggal", "")).upper() for tx in transactions)
+        if pend_found:
+            resolved_pend = resolve_pend_date(transactions, effective_year=None, metadata_period=periode_raw, filename=basename)
+            log_callback(f"[INFO] Tanggal transaksi PEND diselesaikan menjadi tanggal valid: {resolved_pend}")
+            for tx in transactions:
+                if "PEND" in str(tx.get("tanggal", "")).upper():
+                    tx["tanggal"] = "'" + resolved_pend
     
         # --- Fase 2: Koreksi tipe menggunakan saldo sebagai sumber kebenaran (Look-Ahead Cluster Solver) ---
         transactions, current_balance, valid_count, total_debet, total_kredit = _reconcile_bca_transactions(

@@ -622,6 +622,8 @@ class UniversalAccurateConverter:
                 # Hitung tahun efektif dari metadata dokumen jika tersedia (hindari hardcode tahun sekarang)
                 periode_from_meta = transactions[0].get("_periode_raw", "") if transactions else ""
                 year_match = re.search(r'\b(20\d{2}|19\d{2})\b', periode_from_meta) if periode_from_meta else None
+                if not year_match:
+                    year_match = re.search(r'\b(20\d{2}|19\d{2})\b', filepath)
                 effective_year = year_match.group(1) if year_match else str(datetime.datetime.now().year)
 
                 def format_bca_ddmmyyyy(raw_date, year_fallback):
