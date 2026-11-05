@@ -89,7 +89,7 @@ adalah nama kolom yang muncul di file output. JANGAN UBAH value-value ini.
 
 ```
 Row 1     : HEADER (tanggal | transaksi | debet | kredit | Saldo)
-Row 2-8   : DUMMY (7 baris, data dari transaksi yang di-loop)
+Row 2-8   : DUMMY (7 baris spacer kosong, template Accurate Online)
 Row 9     : SEPARATOR "Saldo Awal" (tanggal kosong, transaksi="Saldo Awal", saldo=nilai)
 Row 10+   : DATA TRANSAKSI ASLI (semua baris valid)
 Row N-1   : SEPARATOR "Total Mutasi" (debet=total, kredit=total)
