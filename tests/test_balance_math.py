@@ -631,6 +631,105 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
         self.assertIn("RENSAWALLPAPERSAMA TGH:", c5)
         self.assertIn(".00 ADM:", c5)
 
+    def test_bca_reconciler_same_day_out_of_order_chain(self):
+        """Verifikasi pemulihan urutan kronologis otomatis pada kasus selisih 30 September 2026."""
+        s0 = 235123583.0
+        # Urutan teracak: 12 transaksi CR di atas, 1 transaksi DB payroll di paling bawah
+        raw_txs = [
+            {"tanggal": "'30/09", "keterangan": "MILA LISWATI", "cabang": "'0000", "mutasi": 445000.0, "tipe": "CR", "saldo_printed": 223521583.0},
+            {"tanggal": "'30/09", "keterangan": "WARLINA", "cabang": "'0000", "mutasi": 3176000.0, "tipe": "CR", "saldo_printed": 226697583.0},
+            {"tanggal": "'30/09", "keterangan": "AI SUAIDAH", "cabang": "'0000", "mutasi": 1432000.0, "tipe": "CR", "saldo_printed": 228129583.0},
+            {"tanggal": "'30/09", "keterangan": "NURHADI KUNCORO", "cabang": "'0000", "mutasi": 520000.0, "tipe": "CR", "saldo_printed": 228649583.0},
+            {"tanggal": "'30/09", "keterangan": "RIZKY SETIAWAN", "cabang": "'0000", "mutasi": 700000.0, "tipe": "CR", "saldo_printed": 229349583.0},
+            {"tanggal": "'30/09", "keterangan": "BUNGA MAULIDYA RIS", "cabang": "'0000", "mutasi": 293000.0, "tipe": "CR", "saldo_printed": 229642583.0},
+            {"tanggal": "'30/09", "keterangan": "AYU MONICA", "cabang": "'0000", "mutasi": 880000.0, "tipe": "CR", "saldo_printed": 230522583.0},
+            {"tanggal": "'30/09", "keterangan": "GoPay Bank Transfe", "cabang": "'0000", "mutasi": 160000.0, "tipe": "CR", "saldo_printed": 230682583.0},
+            {"tanggal": "'30/09", "keterangan": "AHMAD KHAERUL", "cabang": "'0000", "mutasi": 30000.0, "tipe": "CR", "saldo_printed": 230712583.0},
+            {"tanggal": "'30/09", "keterangan": "ROHMATULLAH", "cabang": "'0000", "mutasi": 1394000.0, "tipe": "CR", "saldo_printed": 232106583.0},
+            {"tanggal": "'30/09", "keterangan": "NOVIATUL MALIYAH", "cabang": "'0000", "mutasi": 420000.0, "tipe": "CR", "saldo_printed": 232526583.0},
+            {"tanggal": "'30/09", "keterangan": "WpC rika MIMING", "cabang": "'0000", "mutasi": 260000.0, "tipe": "CR", "saldo_printed": 232786583.0},
+            {"tanggal": "'30/09", "keterangan": "TRSF E-BANKING DB 3009/PYBCA/WS95321", "cabang": "'0000", "mutasi": 12047000.0, "tipe": "DB", "saldo_printed": 223076583.0},
+        ]
+        
+        reconciled, final_bal, valid_cnt, tot_deb, tot_kre = _reconcile_bca_transactions(
+            raw_txs, s0, lambda m: None
+        )
+        
+        # 1. Transaksi DB payroll harus otomatis berpindah ke baris pertama tanggal 30/09
+        self.assertEqual(reconciled[0]["tipe"], "DB")
+        self.assertEqual(reconciled[0]["mutasi"], 12047000.0)
+        self.assertEqual(reconciled[0]["saldo"], 223076583.0)
+        
+        # 2. Transaksi terakhir harus berupa WpC rika MIMING dengan Saldo Akhir 232.786.583,00
+        self.assertEqual(reconciled[-1]["keterangan"], "WpC rika MIMING")
+        self.assertEqual(reconciled[-1]["saldo"], 232786583.0)
+        self.assertEqual(final_bal, 232786583.0)
+        self.assertEqual(valid_cnt, 13)
+        self.assertEqual(tot_deb, 12047000.0)
+        self.assertEqual(tot_kre, 9710000.0)
+
+    def test_bca_estatement_pdf_clean_descriptions_and_metadata(self):
+        """Verifikasi ekstraksi e-Statement PDF: metadata lengkap & 0% kebocoran teks header/footer."""
+        pdf_path = r"C:\Users\Dina\Downloads\ESTATEMENTTABUNGANDANGIRO_02789375555_202610_051126100147.pdf"
+        if not os.path.exists(pdf_path):
+            self.skipTest("Berkas PDF e-Statement Oktober 2026 tidak tersedia di folder Downloads.")
+
+        results = []
+        def succ_cb(txs, rek, nm, sa, sak, fp):
+            results.append((txs, rek, nm, sa, sak))
+
+        def err_cb(e):
+            self.fail(f"Ekstraksi e-Statement PDF gagal: {e}")
+
+        process_bca(pdf_path, lambda m: None, lambda p: None, succ_cb, err_cb)
+        
+        self.assertEqual(len(results), 1)
+        txs, rek, nm, sa, sak = results[0]
+        
+        # Verifikasi Metadata
+        self.assertEqual(rek, "2789375555")
+        self.assertEqual(nm, "KRAKATAU INTERIOR CILEGON CV")
+        self.assertEqual(sa, 232786583.0)
+        self.assertEqual(sak, 282900862.0)
+        self.assertEqual(len(txs), 238)
+        
+        # Verifikasi Kebersihan Deskripsi Transaksi (Tidak ada kebocoran header/footer)
+        for tx in txs:
+            desc = tx["keterangan"]
+            self.assertNotIn("REKENING GIRO", desc)
+            self.assertNotIn("PARAHYANGAN", desc)
+            self.assertNotIn("SALDO AKHIR", desc)
+            self.assertNotIn("Bersambung ke", desc)
+
+    def test_panin_dummy_rows_are_blank(self):
+        """Verifikasi bahwa 7 baris dummy di awal DataFrame Panin murni berupa string kosong tanpa nominal."""
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', encoding='utf-8') as f:
+            f.write("TANGGAL,DESKRIPSI,DEBET,KREDIT,SALDO\n")
+            f.write("01/01/2026,SALDO AWAL DUMMY,,10000000,10000000\n")
+            f.write("02/01/2026,UANG MASUK,,5000000,15000000\n")
+            f_path = f.name
+
+        try:
+            results = []
+            def succ_cb(df_out, inv, dummy, fp):
+                results.append((df_out, dummy))
+
+            def err_cb(e):
+                self.fail(str(e))
+
+            process_panin(f_path, False, lambda m: None, lambda p: None, succ_cb, err_cb)
+            
+            df_out, dummy = results[0]
+            self.assertEqual(dummy, 7)
+            # Pastikan ke-7 baris dummy kolom debet, kredit, saldo bernilai kosong
+            for i in range(dummy):
+                self.assertEqual(df_out.iloc[i][OUTPUT_COLUMNS['deb']], "")
+                self.assertEqual(df_out.iloc[i][OUTPUT_COLUMNS['kre']], "")
+                self.assertEqual(df_out.iloc[i][OUTPUT_COLUMNS['bal']], "")
+        finally:
+            if os.path.exists(f_path):
+                os.remove(f_path)
+
 if __name__ == '__main__':
     unittest.main()
 

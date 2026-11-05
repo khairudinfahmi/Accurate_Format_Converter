@@ -1,5 +1,5 @@
 {
-  "latest_version": "5.0.1",
-  "download_url": "https://www.dropbox.com/scl/fi/vuhydy4hcfrawxemqhn7w/Accurate_Converter_Setup_v5.0.1.exe?rlkey=r322fb71cjmuvdc6ayznvg4ci&st=1zyqbsli&dl=1&ext=.exe",
-  "release_notes": "Pembaruan v5.0.1:\n- Perbaikan Kritis BCA Tahapan Multi-Halaman: Menyempurnakan filter header dan footer berulang pada dokumen PDF BCA Tahapan multi-halaman sehingga nominal mutasi dan saldo kas 100% klop tanpa risiko tertimpa teks kop dokumen.\n- Peningkatan Keandalan Validasi: Integrasi pengujian matematis berkelanjutan untuk seluruh varian mutasi rekening koran."
+  "latest_version": "5.1.0",
+  "download_url": "https://www.dropbox.com/scl/fi/vuhydy4hcfrawxemqhn7w/Accurate_Converter_Setup_v5.1.0.exe?rlkey=r322fb71cjmuvdc6ayznvg4ci&st=1zyqbsli&dl=1&ext=.exe",
+  "release_notes": "Pembaruan v5.1.0:\n- Same-Day Chronological Chain Sorter: Otomatis mendeteksi dan merekonstruksi urutan transaksi pada hari yang sama jika baris teracak (seperti transaksi payroll pagi hari yang tergeser ke bawah), menjamin saldo akhir rekening koran 100% klop tanpa selisih.\n- Pembersihan Bersih Header/Footer PDF e-Statement: Menghilangkan kebocoran teks header halaman dan ringkasan footer bank ke dalam kolom keterangan transaksi.\n- Ekstraksi Metadata & Kerning Lengkap: Menangkap nama lengkap nasabah (misal Krakatau Interior Cilegon CV) dan toleransi spasi renggang pada nomor rekening serta periode.\n- Perbaikan Baris Dummy XLS: Mengubah 7 baris dummy pada template Excel (.xls) menjadi baris kosong murni tanpa angka nominal untuk mencegah transaksi terhitung ganda saat diimpor ke Accurate Online."
 }

@@ -134,13 +134,107 @@ def resolve_pend_date(transactions, effective_year=None, metadata_period="", fil
     else:
         return f"{now.day:02d}/{now.month:02d}/{eff_year}"
 
+def _reorder_same_day_transactions(day_transactions, start_balance, log_callback=None):
+    """
+    Deterministic greedy solver untuk mengurutkan transaksi pada hari yang sama
+    sehingga setiap perpindahan saldo cocok dengan saldo_printed.
+    Hanya dijalankan jika seluruh transaksi pada hari tersebut memiliki saldo_printed
+    (misal pada tabel hasil sortiran Excel / mutasi cetak yang teracak).
+    """
+    if len(day_transactions) <= 1 or not all(t.get("saldo_printed") is not None for t in day_transactions):
+        return day_transactions
+
+    # 1. Cek apakah urutan saat ini sudah konsisten secara matematis
+    b = start_balance
+    current_valid = True
+    for tx in day_transactions:
+        m = tx["mutasi"]
+        b = round(b + (m if tx["tipe"] == "CR" else -m), 2)
+        if abs(b - tx["saldo_printed"]) > 0.01:
+            current_valid = False
+            break
+
+    if current_valid:
+        return day_transactions
+
+    # 2. Urutan saat ini tidak konsisten / teracak barisnya.
+    # Lakukan greedy walk mencari sambungan rantai saldo yang valid di setiap langkah.
+    ordered = []
+    rem = list(day_transactions)
+    cur = start_balance
+
+    for _ in range(len(day_transactions)):
+        found = False
+        # Percobaan A: Gunakan tipe asli transaksi
+        for idx, t in enumerate(rem):
+            m = t["mutasi"]
+            nxt = round(cur + (m if t["tipe"] == "CR" else -m), 2)
+            if abs(nxt - t["saldo_printed"]) < 0.01:
+                ordered.append(t)
+                rem.pop(idx)
+                cur = nxt
+                found = True
+                break
+
+        # Percobaan B: Coba balik tanda (CR <-> DB) jika tidak ditemukan sambungan langsung
+        if not found:
+            for idx, t in enumerate(rem):
+                m = t["mutasi"]
+                rev_type = "DB" if t["tipe"] == "CR" else "CR"
+                nxt = round(cur + (m if rev_type == "CR" else -m), 2)
+                if abs(nxt - t["saldo_printed"]) < 0.01:
+                    t_fixed = dict(t)
+                    t_fixed["tipe"] = rev_type
+                    ordered.append(t_fixed)
+                    rem.pop(idx)
+                    cur = nxt
+                    found = True
+                    break
+
+        if not found:
+            # Tidak bisa dirangkai sempurna, pertahankan urutan asli
+            return day_transactions
+
+    if log_callback:
+        tgl_display = day_transactions[0].get("tanggal", "").replace("'", "")
+        log_callback(f"[INFO] Mendeteksi pergeseran urutan transaksi pada tanggal {tgl_display}. Berhasil merekonstruksi urutan kronologis otomatis.")
+
+    return ordered
+
 def _reconcile_bca_transactions(transactions, saldo_awal, log_callback):
     """
-    Rekonsiliasi matematis saldo berjenjang dengan Look-Ahead Cluster Solver:
-    - Jika saldo tercetak ada di setiap baris: evaluasi langsung per baris.
-    - Jika ada baris tanpa saldo tercetak sebelum baris dengan saldo tercetak (cluster multi-transaksi):
+    Rekonsiliasi matematis saldo berjenjang dengan Look-Ahead Cluster Solver & Same-Day Chain Sorter:
+    - Fase 0: Rekonstruksi kronologis transaksi pada hari yang sama jika urutan teracak.
+    - Fase 1: Jika saldo tercetak ada di setiap baris: evaluasi langsung per baris.
+    - Fase 2: Jika ada baris tanpa saldo tercetak sebelum baris dengan saldo tercetak (cluster multi-transaksi):
       selesaikan kombinasi tanda (+ / -) mutasi agar total perubahan sama persis dengan saldo akhir cluster.
     """
+    # --- Fase 0: Pre-Reconciliation Same-Day Chronological Sorter ---
+    new_transactions = []
+    running_bal = saldo_awal
+    n_total = len(transactions)
+    idx_start = 0
+
+    while idx_start < n_total:
+        cur_tgl = transactions[idx_start].get("tanggal", "")
+        idx_end = idx_start + 1
+        while idx_end < n_total and transactions[idx_end].get("tanggal", "") == cur_tgl:
+            idx_end += 1
+
+        day_group = transactions[idx_start:idx_end]
+        ordered_group = _reorder_same_day_transactions(day_group, running_bal, log_callback)
+        new_transactions.extend(ordered_group)
+
+        for tx in ordered_group:
+            m = tx["mutasi"]
+            running_bal = round(running_bal + (m if tx["tipe"] == "CR" else -m), 2)
+            if tx.get("saldo_printed") is not None:
+                running_bal = tx["saldo_printed"]
+
+        idx_start = idx_end
+
+    transactions = new_transactions
+
     current_balance = saldo_awal
     n = len(transactions)
     i = 0
@@ -224,6 +318,8 @@ def _reconcile_bca_transactions(transactions, saldo_awal, log_callback):
                 log_msg = f"T: {transactions[k]['tanggal'].replace('\'','')} | {transactions[k]['tipe']}: {transactions[k]['mutasi']:,.2f} | S: {transactions[k]['saldo']:,.2f}"
                 log_callback(log_msg)
                 
+            if abs(current_balance - target_balance) > 0.01:
+                log_callback(f"[WARN] Penyesuaian saldo akhir cluster: {current_balance:,.2f} -> {target_balance:,.2f}")
             current_balance = round(target_balance, 2)
             transactions[j]["saldo"] = current_balance
             i = j + 1
@@ -361,8 +457,17 @@ def _process_bca_csv(filepath, log_callback, progress_callback, success_callback
                             tipe_val = "DB"
                             mutasi_val = clean_currency(re.sub(r'DB', '', mut_str, flags=re.IGNORECASE))
                         else:
-                            tipe_val = "CR"
                             mutasi_val = clean_currency(mut_str)
+                            desc_u = desc.upper()
+                            if desc_u.startswith("DB ") or " DB" in desc_u \
+                               or "BIAYA" in desc_u or "PAJAK" in desc_u \
+                               or "TARIKAN" in desc_u or "POTONGAN" in desc_u \
+                               or "KARTU DEBIT" in desc_u or "PEMBAYARAN" in desc_u \
+                               or "PEMBELIAN" in desc_u or "SWITCHING DB" in desc_u \
+                               or "BYR VIA" in desc_u or "PYBCA" in desc_u:
+                                tipe_val = "DB"
+                            else:
+                                tipe_val = "CR"
 
                 saldo_val = clean_currency(row[header_cols['bal']]) if 'bal' in header_cols and len(row) > header_cols['bal'] else 0.0
 
@@ -516,7 +621,21 @@ def _process_bca_excel(filepath, log_callback, progress_callback, success_callba
                 tipe_val = "DB" if "DB" in t_str else "CR"
             else:
                 m_str = str(row[col_map['mut']]).upper()
-                tipe_val = "DB" if "DB" in m_str else "CR"
+                if "DB" in m_str:
+                    tipe_val = "DB"
+                elif "CR" in m_str:
+                    tipe_val = "CR"
+                else:
+                    desc_u = desc.upper()
+                    if desc_u.startswith("DB ") or " DB" in desc_u \
+                       or "BIAYA" in desc_u or "PAJAK" in desc_u \
+                       or "TARIKAN" in desc_u or "POTONGAN" in desc_u \
+                       or "KARTU DEBIT" in desc_u or "PEMBAYARAN" in desc_u \
+                       or "PEMBELIAN" in desc_u or "SWITCHING DB" in desc_u \
+                       or "BYR VIA" in desc_u or "PYBCA" in desc_u:
+                        tipe_val = "DB"
+                    else:
+                        tipe_val = "CR"
 
             saldo_val = clean_currency(row[col_map['bal']])
 
@@ -829,26 +948,49 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
         total_pages = len(pdf.pages)
         log_callback(f"PDF terdeteksi: {total_pages} halaman.")
         
+        basename = os.path.basename(filepath)
         page0 = pdf.pages[0]
-        text0 = page0.extract_text()
-        if text0:
-            lines = text0.split('\n')
-            for line in lines:
-                if 'NO. REKENING' in line.upper():
-                    match = re.search(r'NO\.\s*REKENING\s*:\s*(\d+)', line, re.IGNORECASE)
-                    if match: rekening = match.group(1)
-            
-            per_m = re.search(r'PERIODE\s*:?\s*([^\n\r]+)', text0, re.IGNORECASE)
-            if per_m:
-                periode_raw = per_m.group(1).strip()
-            
-            words = page0.extract_words()
-            for w in words:
-                if w['top'] > 70 and w['top'] < 90 and w['x0'] < 100:
-                    if w['text'] not in ['NO.', 'REKENING', ':']:
-                        nama += w['text'] + " "
-            nama = nama.strip()[:240]
+        text0 = page0.extract_text() or ""
         
+        # 1. Ekstraksi Nomor Rekening (dengan toleransi kerning spasi renggang & fallback nama file)
+        rek_m = re.search(r'NO\.?\s*REKENING\s*:\s*(\d+)', text0, re.IGNORECASE)
+        if rek_m:
+            rekening = rek_m.group(1).strip()
+        else:
+            rek_m_kern = re.search(r'NO\.?\s*R\s*E\s*K\s*E\s*N\s*I\s*N\s*G\s*:\s*([\d\s]+)', text0, re.IGNORECASE)
+            if rek_m_kern:
+                digits = re.sub(r'\D', '', rek_m_kern.group(1))
+                if len(digits) >= 8:
+                    rekening = digits
+            if not rekening:
+                rek_fn = re.search(r'(?:ESTATEMENT(?:TABUNGANDANGIRO)?_|MutasiRekening_|[^\d])0?(\d{10})\b', basename)
+                if rek_fn:
+                    rekening = rek_fn.group(1)
+
+        # 2. Ekstraksi Nama Lengkap Nasabah (area top 70-92, x0 < 300)
+        words0 = page0.extract_words()
+        name_words = []
+        for w in words0:
+            if 70 < w['top'] < 92 and w['x0'] < 300:
+                if w['text'] not in ['NO.', 'REKENING', ':', 'NO', 'REK']:
+                    name_words.append(w['text'])
+        if name_words:
+            nama = " ".join(name_words).strip()[:240]
+
+        if not nama:
+            nama_m = re.search(r'Nama\s*(?:Rekening)?\s*:?\s*([^\n\r]+)', text0, re.IGNORECASE)
+            if nama_m:
+                nama = nama_m.group(1).strip()[:240]
+
+        # 3. Ekstraksi Periode
+        per_m = re.search(r'P\s*E\s*R\s*I\s*O\s*D\s*E\s*:?\s*([^\n\r]+)', text0, re.IGNORECASE)
+        if per_m:
+            periode_raw = re.sub(r'\s+', ' ', per_m.group(1)).strip()
+        else:
+            fn_m = re.search(r'(\d{4})(\d{2})', basename)
+            if fn_m:
+                periode_raw = f"{fn_m.group(2)}/{fn_m.group(1)}"
+
         if not rekening: rekening = "1234567890"
         if not nama: nama = "NASABAH BCA"
 
@@ -874,25 +1016,41 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
                 current_line.append(w)
             if current_line: lines.append(current_line)
             
+            table_started = False
             for line in lines:
                 text_line = " ".join([w['text'] for w in line])
-                
-                if "SALDO AWAL" in text_line.upper():
-                    for w in reversed(line):
-                        if w['x0'] > 480:
-                            saldo_awal = clean_currency(w['text'])
-                            break
+                upper_line = text_line.upper()
+
+                # Deteksi baris header tabel di halaman ini
+                if "TANGGAL" in upper_line and "KETERANGAN" in upper_line and ("MUTASI" in upper_line or "SALDO" in upper_line or "CBG" in upper_line):
+                    table_started = True
                     continue
-                    
-                if "TANGGAL KETERANGAN CBG MUTASI SALDO" in text_line.upper(): continue
-                if "MUTASI CR :" in text_line.upper() or "MUTASI DB :" in text_line.upper() or "SALDO AKHIR :" in text_line.upper(): continue
+                # Fallback: jika melewati batas header koordinat top > 240 dan ada tanggal mutasi
+                if not table_started:
+                    if line and line[0]['top'] > 240 and any(w['x0'] < 85 and bool(re.search(r'\d{2}/\d{2}', w['text'])) for w in line):
+                        table_started = True
+                    else:
+                        continue
+
+                # Hentikan pembacaan jika menemui batas penutup halaman atau footer ringkasan
+                if "BERSAMBUNG KE" in upper_line or "SALDO AKHIR" in upper_line or "MUTASI CR" in upper_line or "MUTASI DB" in upper_line:
+                    break
+
                 # Filter baris header berulang pada halaman 2+
-                if "REKENING TAHAPAN" in text_line.upper() or "NO. REKENING" in text_line.upper() or "NOMOR REKENING" in text_line.upper(): continue
-                if "HALAMAN :" in text_line.upper() or "PERIODE :" in text_line.upper() or "MATA UANG :" in text_line.upper(): continue
-                if "CATATAN:" in text_line.upper() or "APABILA NASABAH" in text_line.upper() or "BCA BERHAK" in text_line.upper(): continue
-                if "TELAH MENYETUJUI" in text_line.upper(): continue
-                if "Bersambung ke " in text_line: continue
-                
+                if "REKENING TAHAPAN" in upper_line or "REKENING GIRO" in upper_line or "NO. REKENING" in upper_line or "NOMOR REKENING" in upper_line:
+                    continue
+                if "HALAMAN :" in upper_line or "PERIODE :" in upper_line or "MATA UANG :" in upper_line:
+                    continue
+                if "CATATAN:" in upper_line or "APABILA NASABAH" in upper_line or "BCA BERHAK" in upper_line or "TELAH MENYETUJUI" in upper_line:
+                    continue
+
+                if "SALDO AWAL" in upper_line:
+                    if saldo_awal is None or saldo_awal == 0.0:
+                        for w in reversed(line):
+                            if w['x0'] > 480:
+                                saldo_awal = clean_currency(w['text'])
+                                break
+                    continue
                 all_lines.append(line)
         
         y_blocks = []

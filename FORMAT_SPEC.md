@@ -320,26 +320,22 @@ num_dummy = 7
 Nilai ini TIDAK BOLEH diubah. Accurate Online membutuhkan tepat 7 baris
 dummy di awal file untuk mencocokkan template import.
 
-### 4.2 Cara Pengisian Dummy
+### 4.2 Cara Pengisian Dummy (Spacer Baris Kosong Tanpa Duplikasi)
 
-Jika jumlah transaksi >= 7:
-  Ambil 7 baris pertama dari data transaksi.
-
-Jika jumlah transaksi < 7:
-  Loop ulang data transaksi sampai genap 7 baris menggunakan modulo:
+Baris dummy diisi dengan 7 baris spacer kosong (semua field berupa string kosong `""`),
+sehingga tidak ada nilai transaksi yang terhitung ganda (*double entry*) saat file `.xls`
+diimpor atau dibuka di Accurate Online / Excel:
 
 ```python
-if len(df_final) >= num_dummy:
-    df_dummy = df_final.iloc[:num_dummy].copy()
-else:
-    rows = []
-    for i in range(num_dummy):
-        rows.append(df_final.iloc[i % len(df_final)].to_dict())
-    df_dummy = pd.DataFrame(rows)
+dummy_rows = [{
+    OUTPUT_COLUMNS['tgl']: '',
+    OUTPUT_COLUMNS['desc']: '',
+    OUTPUT_COLUMNS['deb']: '',
+    OUTPUT_COLUMNS['kre']: '',
+    OUTPUT_COLUMNS['bal']: ''
+} for _ in range(num_dummy)]
+df_dummy = pd.DataFrame(dummy_rows)
 ```
-
-Contoh: Jika hanya ada 3 transaksi (A, B, C), dummy akan menjadi:
-A, B, C, A, B, C, A (7 baris)
 
 ### 4.3 Styling Dummy di XLS
 
