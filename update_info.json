@@ -1,5 +1,5 @@
 {
-  "latest_version": "5.2.1",
-  "download_url": "https://www.dropbox.com/scl/fi/pd03ntiezfsj4y46exgtd/Accurate_Converter_Setup_v5.2.1.exe?rlkey=o6lwzt5zqxe7eeupkct99eky1&st=zmastvoi&dl=1&ext=.exe",
-  "release_notes": "- Bisa pilih rentang tanggal mutasi (tersedia tombol cepat tgl 1-15 & 16-akhir)\n- Pilihan tanggal tinggal klik dari daftar, tidak perlu ketik manual\n- Saldo awal dan akhir otomatis dihitung ulang dan dijamin tetap klop\n- Bebas pilih format file yang ingin disimpan (JSON, Excel, CSV)\n- Bank BCA otomatis jadi pilihan default saat buka aplikasi"
+  "latest_version": "5.2.2",
+  "download_url": "https://github.com/khairudinfahmi/Accurate_Format_Converter/releases/download/v5.2.2/Accurate_Converter_Setup_v5.2.2.exe",
+  "release_notes": "- Bisa pilih 1 tanggal saja atau rentang tanggal mutasi (ada tombol cepat tgl 1-15 & 16-akhir)\n- Jika hanya pilih 1 format template, file langsung disimpan tanpa membuat folder baru\n- Pilihan tanggal tinggal klik dari daftar, tidak perlu ketik manual\n- Saldo awal dan akhir otomatis dihitung ulang dan dijamin tetap klop\n- Bebas centang format file yang ingin disimpan (JSON, Excel, CSV)\n- Bank BCA otomatis jadi pilihan default saat buka aplikasi"
 }

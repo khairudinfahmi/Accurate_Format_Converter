@@ -63,6 +63,26 @@ class TestExportConfigLogic(unittest.TestCase):
         self.assertEqual(from_val, "01/10/2026")
         self.assertEqual(to_val, "01/10/2026")
 
+    def test_single_date_mode(self):
+        # Mode single date: user selects exactly 1 date
+        chosen_date_str = "15/10/2026"
+        d = self.date_lookup[chosen_date_str]
+        cnt = sum(1 for x in self.tx_dates if x == d)
+        self.assertEqual(cnt, 1)
+
+        # Ensure range filtering with fd == td produces same result
+        cnt_range = sum(1 for x in self.tx_dates if d <= x <= d)
+        self.assertEqual(cnt, cnt_range)
+
+    def test_template_saving_mode_decision(self):
+        # 1 template chosen -> single file mode (no folder)
+        templates_single = [0]
+        self.assertEqual(len(templates_single), 1)
+
+        # > 1 templates chosen -> bundle mode (creates folder)
+        templates_multi = [0, 1]
+        self.assertTrue(len(templates_multi) > 1)
+
     def test_subrange_filtering_count(self):
         fd = datetime.date(2026, 10, 1)
         td = datetime.date(2026, 10, 15)

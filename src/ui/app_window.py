@@ -22,7 +22,7 @@ from processors.bca_processor import process_bca
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        version_str = "5.2.1"
+        version_str = "5.2.2"
         try:
             exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             v_path = os.path.join(exe_dir, "version.txt")
@@ -481,10 +481,11 @@ class UniversalAccurateConverter:
 
         min_date = unique_dates[0]
         max_date = unique_dates[-1]
+        is_single_date_dataset = (len(unique_dates) == 1)
 
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Pengaturan Hasil Konversi")
-        dialog.geometry("560x570")
+        dialog.geometry("560x590")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
@@ -500,49 +501,66 @@ class UniversalAccurateConverter:
 
         dialog.update_idletasks()
         x = self.root.winfo_x() + (self.root.winfo_width() - 560) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - 570) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 590) // 2
         dialog.geometry(f"+{max(0,x)}+{max(0,y)}")
 
         main_f = ctk.CTkFrame(dialog, fg_color="transparent")
         main_f.pack(fill="both", expand=True, padx=25, pady=20)
 
-        # === SECTION 1: DATE RANGE ===
+        # === SECTION 1: DATE SELECTION ===
         ctk.CTkLabel(main_f, text="RENTANG TANGGAL",
                      font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
                      text_color=("#1A1F36", "#F7FAFC")).pack(anchor="w")
         ctk.CTkLabel(main_f,
                      text=f"Data tersedia: {date_options[0]} — {date_options[-1]}  ({total_count} transaksi)",
                      font=ctk.CTkFont(family="Inter", size=12),
-                     text_color=("#8792A2", "#A0AABF")).pack(anchor="w", pady=(2, 8))
+                     text_color=("#8792A2", "#A0AABF")).pack(anchor="w", pady=(2, 6))
 
+        mode_var = tk.StringVar(value="single" if is_single_date_dataset else "range")
         from_var = tk.StringVar(value=date_options[0])
         to_var = tk.StringVar(value=date_options[-1])
+        single_var = tk.StringVar(value=date_options[0])
 
-        # Modern Quick Preset Chips (Pilihan Cepat 2026)
-        preset_frame = ctk.CTkFrame(main_f, fg_color="transparent")
-        preset_frame.pack(fill="x", pady=(0, 10))
+        # Mode Selector (Hanya jika mutasi memiliki lebih dari 1 tanggal)
+        if not is_single_date_dataset:
+            mode_frame = ctk.CTkFrame(main_f, fg_color="transparent")
+            mode_frame.pack(fill="x", pady=(0, 6))
+
+            ctk.CTkLabel(mode_frame, text="Pilih Mode:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                         text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 10))
+
+            def on_mode_change():
+                if mode_var.get() == "single":
+                    range_container.pack_forget()
+                    single_container.pack(fill="x", pady=(0, 8))
+                else:
+                    single_container.pack_forget()
+                    range_container.pack(fill="x", pady=(0, 8))
+                update_count()
+
+            ctk.CTkRadioButton(mode_frame, text="Rentang Tanggal", variable=mode_var, value="range",
+                               command=on_mode_change, font=ctk.CTkFont(family="Inter", size=12),
+                               fg_color=("#3B82F6", "#2563EB"), text_color=("#1A1F36", "#F7FAFC")).pack(side="left", padx=(0, 15))
+            ctk.CTkRadioButton(mode_frame, text="Satu Tanggal Saja", variable=mode_var, value="single",
+                               command=on_mode_change, font=ctk.CTkFont(family="Inter", size=12),
+                               fg_color=("#3B82F6", "#2563EB"), text_color=("#1A1F36", "#F7FAFC")).pack(side="left")
+
+        # Container 1: Mode Rentang Tanggal (Presets + 2 Dropdown)
+        range_container = ctk.CTkFrame(main_f, fg_color="transparent")
+
+        preset_frame = ctk.CTkFrame(range_container, fg_color="transparent")
+        preset_frame.pack(fill="x", pady=(0, 8))
 
         ctk.CTkLabel(preset_frame, text="Pilihan Cepat:",
                      font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
                      text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 8))
 
         # Dropdowns Frame (Dari & Sampai)
-        date_frame = ctk.CTkFrame(main_f, fg_color="transparent")
-        date_frame.pack(fill="x", pady=(0, 12))
+        date_frame = ctk.CTkFrame(range_container, fg_color="transparent")
+        date_frame.pack(fill="x", pady=(0, 4))
 
         ctk.CTkLabel(date_frame, text="Dari:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
                      text_color=("#4F566B", "#D3D9E6")).pack(side="left")
-
-        # Function to update count label dynamically
-        def update_count():
-            fd = date_lookup.get(from_var.get(), min_date)
-            td = date_lookup.get(to_var.get(), max_date)
-            cnt = sum(1 for d in tx_dates if fd <= d <= td)
-            pct = (cnt / total_count * 100) if total_count > 0 else 0
-            count_label.configure(
-                text=f"Transaksi yang akan diekspor: {cnt} dari {total_count} ({pct:.1f}%)",
-                text_color=("#10B981", "#10B981") if cnt > 0 else ("#EF4444", "#EF4444")
-            )
 
         def on_from_select(choice):
             from_var.set(choice)
@@ -617,6 +635,35 @@ class UniversalAccurateConverter:
                           fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
                           text_color=("#4F566B", "#D3D9E6"), corner_radius=6, command=set_preset_p2).pack(side="left", padx=(0, 6))
 
+        # Container 2: Mode Satu Tanggal Saja (Hanya 1 Dropdown)
+        single_container = ctk.CTkFrame(main_f, fg_color="transparent")
+        single_row = ctk.CTkFrame(single_container, fg_color="transparent")
+        single_row.pack(fill="x", pady=(0, 4))
+
+        ctk.CTkLabel(single_row, text="Pilih Tanggal:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                     text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 10))
+
+        def on_single_select(choice):
+            single_var.set(choice)
+            update_count()
+
+        single_menu = ctk.CTkOptionMenu(
+            single_row, values=date_options, variable=single_var, command=on_single_select,
+            width=160, height=36,
+            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
+            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
+            fg_color=("#E3E8EE", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
+            button_hover_color=("#94A3B8", "#718096"), text_color=("#1A202C", "#F7FAFC"),
+            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
+        )
+        single_menu.pack(side="left")
+
+        # Initial layout pack
+        if is_single_date_dataset:
+            single_container.pack(fill="x", pady=(0, 8))
+        else:
+            range_container.pack(fill="x", pady=(0, 8))
+
         ctk.CTkFrame(main_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=10)
 
         # === SECTION 2: TEMPLATE SELECTION ===
@@ -643,9 +690,24 @@ class UniversalAccurateConverter:
         chk_vars = []
         chk_widgets = []
 
+        tmpl_hint_label = ctk.CTkLabel(main_f, text="", font=ctk.CTkFont(family="Inter", size=11))
+
+        def update_tmpl_hint():
+            sel_cnt = sum(1 for v in chk_vars if v.get() == 1)
+            if sel_cnt == 1:
+                tmpl_hint_label.configure(text="💡 1 template dipilih: berkas akan disimpan langsung tanpa membuat folder baru.",
+                                          text_color=("#10B981", "#10B981"))
+            elif sel_cnt > 1:
+                tmpl_hint_label.configure(text=f"💡 {sel_cnt} template dipilih: berkas akan disimpan rapi di dalam satu folder.",
+                                          text_color=("#6B7280", "#9CA3AF"))
+            else:
+                tmpl_hint_label.configure(text="⚠ Pilih minimal satu template output.",
+                                          text_color=("#EF4444", "#EF4444"))
+
         def on_chk_click():
             any_off = any(v.get() == 0 for v in chk_vars)
             btn_toggle_tmpl.configure(text="Pilih Semua" if all(v.get() == 0 for v in chk_vars) else ("Pilih Semua" if any_off else "Batalkan Semua"))
+            update_tmpl_hint()
 
         for name in template_names:
             var = tk.IntVar(value=1)
@@ -670,6 +732,7 @@ class UniversalAccurateConverter:
                 else:
                     c.deselect()
             btn_toggle_tmpl.configure(text="Batalkan Semua" if any_off else "Pilih Semua")
+            update_tmpl_hint()
 
         btn_toggle_tmpl = ctk.CTkButton(tmpl_header, text="Batalkan Semua", height=24, width=95,
                                         font=ctk.CTkFont(family="Inter", size=11),
@@ -677,6 +740,9 @@ class UniversalAccurateConverter:
                                         text_color=("#4F566B", "#D3D9E6"), corner_radius=6,
                                         command=toggle_all_templates)
         btn_toggle_tmpl.pack(side="right")
+
+        tmpl_hint_label.pack(anchor="w", pady=(4, 0))
+        update_tmpl_hint()
 
         ctk.CTkFrame(main_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=10)
 
@@ -687,6 +753,21 @@ class UniversalAccurateConverter:
                                    text_color=("#10B981", "#10B981"))
         count_label.pack(anchor="w", pady=(0, 15))
 
+        # Function to update count label dynamically
+        def update_count():
+            if mode_var.get() == "single":
+                sel_d = date_lookup.get(single_var.get(), min_date)
+                cnt = sum(1 for d in tx_dates if d == sel_d)
+            else:
+                fd = date_lookup.get(from_var.get(), min_date)
+                td = date_lookup.get(to_var.get(), max_date)
+                cnt = sum(1 for d in tx_dates if fd <= d <= td)
+            pct = (cnt / total_count * 100) if total_count > 0 else 0
+            count_label.configure(
+                text=f"Transaksi yang akan diekspor: {cnt} dari {total_count} ({pct:.1f}%)",
+                text_color=("#10B981", "#10B981") if cnt > 0 else ("#EF4444", "#EF4444")
+            )
+
         # === BUTTONS ===
         btn_frame = ctk.CTkFrame(main_f, fg_color="transparent")
         btn_frame.pack(fill="x")
@@ -696,19 +777,26 @@ class UniversalAccurateConverter:
             if not selected:
                 messagebox.showwarning("Peringatan", "Pilih minimal satu template output.", parent=dialog)
                 return
-            fd = date_lookup.get(from_var.get())
-            td = date_lookup.get(to_var.get())
-            if not fd or not td:
-                messagebox.showwarning("Peringatan", "Pilih tanggal yang valid.", parent=dialog)
-                return
-            if fd > td:
-                messagebox.showwarning("Rentang Tidak Valid",
-                                       "Tanggal 'Dari' harus sebelum atau sama dengan tanggal 'Sampai'.", parent=dialog)
-                return
+            if mode_var.get() == "single":
+                sel_d = date_lookup.get(single_var.get())
+                if not sel_d:
+                    messagebox.showwarning("Peringatan", "Pilih tanggal yang valid.", parent=dialog)
+                    return
+                fd = td = sel_d
+            else:
+                fd = date_lookup.get(from_var.get())
+                td = date_lookup.get(to_var.get())
+                if not fd or not td:
+                    messagebox.showwarning("Peringatan", "Pilih tanggal yang valid.", parent=dialog)
+                    return
+                if fd > td:
+                    messagebox.showwarning("Rentang Tidak Valid",
+                                           "Tanggal 'Dari' harus sebelum atau sama dengan tanggal 'Sampai'.", parent=dialog)
+                    return
             cnt = sum(1 for d in tx_dates if fd <= d <= td)
             if cnt == 0:
                 messagebox.showwarning("Tidak Ada Data",
-                                       "Tidak ada transaksi dalam rentang tanggal yang dipilih.", parent=dialog)
+                                       "Tidak ada transaksi pada tanggal yang dipilih.", parent=dialog)
                 return
             result['date_from'] = fd
             result['date_to'] = td
@@ -860,7 +948,10 @@ class UniversalAccurateConverter:
             self.update_progress(1.0)
             rekomendasi_txt = "\nSaran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi ini paling stabil dan tidak terpengaruh perubahan format dari pihak bank."
             files_list_str = "\n".join([f"{idx+1}. {fn}" for idx, fn in enumerate(saved_files)])
-            range_info = f"Rentang Tanggal: {date_from.strftime('%d/%m/%Y')} s/d {date_to.strftime('%d/%m/%Y')}\nTotal Mutasi: {len(df_filtered_tx)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
+            if date_from == date_to:
+                range_info = f"Tanggal Mutasi: {date_from.strftime('%d/%m/%Y')} (1 Hari)\nTotal Mutasi: {len(df_filtered_tx)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
+            else:
+                range_info = f"Rentang Tanggal: {date_from.strftime('%d/%m/%Y')} s/d {date_to.strftime('%d/%m/%Y')}\nTotal Mutasi: {len(df_filtered_tx)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
 
             audit_table = getattr(df_output, 'attrs', {}).get("audit_table", "")
             if len(df_filtered_tx) < len(df_tx):
@@ -956,34 +1047,78 @@ class UniversalAccurateConverter:
 
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:bca[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
-            default_name = f"BCA_{base_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}"
-
-            save_path_raw = filedialog.asksaveasfilename(
-                defaultextension="",
-                filetypes=[("Folder Penyimpanan", "*.*")],
-                title="Simpan Format Accurate BCA (Akan dibuatkan Folder)",
-                initialfile=default_name
-            )
-
-            if not save_path_raw:
-                self.update_progress(0)
-                self.log("[INFO] Penyimpanan dibatalkan oleh user.")
-                messagebox.showinfo("Batal", "Penyimpanan file dibatalkan.")
-                return
-
-            parent_dir = os.path.dirname(save_path_raw)
-            chosen_basename = os.path.splitext(os.path.basename(save_path_raw))[0]
-
-            folder_name = f"Hasil Konversi BCA - {chosen_basename}"
-            target_dir = os.path.join(parent_dir, folder_name)
-            os.makedirs(target_dir, exist_ok=True)
-
-            aol_json_path = os.path.join(target_dir, f"{chosen_basename} (1 - Template AOL Format JSON).json")
-            backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Template AOL Format Excel (Non-JSON)).xls")
-            save_path = os.path.join(target_dir, f"{chosen_basename} (3 - Template Rekening Tahapan).csv")
-            klikbca_path = os.path.join(target_dir, f"{chosen_basename} (4 - Template Rekening Giro).csv")
 
             saved_files = []
+
+            if len(chosen_templates) == 1:
+                single_idx = chosen_templates[0]
+                if single_idx == 0:
+                    default_file_name = f"{base_name} (1 - Template AOL Format JSON).json"
+                    def_ext = ".json"
+                    file_types = [("JSON File", "*.json"), ("Semua File", "*.*")]
+                    dialog_title = "Simpan Template AOL Format JSON"
+                elif single_idx == 1:
+                    default_file_name = f"{base_name} (2 - Template AOL Format Excel (Non-JSON)).xls"
+                    def_ext = ".xls"
+                    file_types = [("Excel 97-2003", "*.xls"), ("Semua File", "*.*")]
+                    dialog_title = "Simpan Template AOL Format Excel"
+                elif single_idx == 2:
+                    default_file_name = f"{base_name} (3 - Template Rekening Tahapan).csv"
+                    def_ext = ".csv"
+                    file_types = [("CSV File", "*.csv"), ("Semua File", "*.*")]
+                    dialog_title = "Simpan Template Rekening Tahapan"
+                else:
+                    default_file_name = f"{base_name} (4 - Template Rekening Giro).csv"
+                    def_ext = ".csv"
+                    file_types = [("CSV File", "*.csv"), ("Semua File", "*.*")]
+                    dialog_title = "Simpan Template Rekening Giro"
+
+                save_path_file = filedialog.asksaveasfilename(
+                    defaultextension=def_ext,
+                    filetypes=file_types,
+                    title=dialog_title,
+                    initialfile=default_file_name
+                )
+                if not save_path_file:
+                    self.update_progress(0)
+                    self.log("[INFO] Penyimpanan dibatalkan oleh user.")
+                    messagebox.showinfo("Batal", "Penyimpanan file dibatalkan.")
+                    return
+
+                aol_json_path = save_path_file
+                backup_path = save_path_file
+                save_path = save_path_file
+                klikbca_path = save_path_file
+                result_save_dest = save_path_file
+                location_text = f"Berkas hasil konversi BCA berhasil disimpan:\n{save_path_file}\n\n"
+
+            else:
+                default_name = f"Hasil Konversi BCA - {base_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}"
+                save_path_raw = filedialog.asksaveasfilename(
+                    defaultextension="",
+                    filetypes=[("Folder Penyimpanan", "*.*")],
+                    title="Simpan Format Accurate BCA (Pilih Lokasi Folder)",
+                    initialfile=default_name
+                )
+
+                if not save_path_raw:
+                    self.update_progress(0)
+                    self.log("[INFO] Penyimpanan dibatalkan oleh user.")
+                    messagebox.showinfo("Batal", "Penyimpanan file dibatalkan.")
+                    return
+
+                parent_dir = os.path.dirname(save_path_raw)
+                chosen_basename = os.path.splitext(os.path.basename(save_path_raw))[0]
+
+                target_dir = os.path.join(parent_dir, chosen_basename)
+                os.makedirs(target_dir, exist_ok=True)
+
+                aol_json_path = os.path.join(target_dir, f"{chosen_basename} (1 - Template AOL Format JSON).json")
+                backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Template AOL Format Excel (Non-JSON)).xls")
+                save_path = os.path.join(target_dir, f"{chosen_basename} (3 - Template Rekening Tahapan).csv")
+                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (4 - Template Rekening Giro).csv")
+                result_save_dest = target_dir
+                location_text = f"Berkas hasil konversi BCA berhasil disimpan ke folder:\n{target_dir}\n\n"
 
             # 1. Template 1: AOL JSON (Index 0)
             if 0 in chosen_templates:
@@ -1107,11 +1242,14 @@ class UniversalAccurateConverter:
 
             self.update_progress(1.0)
             files_list_str = "\n".join(saved_files)
-            range_info = f"Rentang Tanggal: {date_from.strftime('%d/%m/%Y')} s/d {date_to.strftime('%d/%m/%Y')}\nTotal Mutasi: {len(filtered_txs)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
+            if date_from == date_to:
+                range_info = f"Tanggal Mutasi: {date_from.strftime('%d/%m/%Y')} (1 Hari)\nTotal Mutasi: {len(filtered_txs)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
+            else:
+                range_info = f"Rentang Tanggal: {date_from.strftime('%d/%m/%Y')} s/d {date_to.strftime('%d/%m/%Y')}\nTotal Mutasi: {len(filtered_txs)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
             audit_table = transactions[0].get("_audit_table", "") if transactions else ""
 
             msg = (
-                f"Berkas hasil konversi BCA berhasil disimpan ke folder:\n{target_dir}\n\n"
+                f"{location_text}"
                 f"Template Terpilih ({len(saved_files)} berkas):\n{files_list_str}\n\n"
                 f"{range_info}\n\n"
                 f"Saran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi Accurate ini paling stabil, baku, dan jarang terpengaruh perubahan tata letak dari pihak bank."
@@ -1127,7 +1265,7 @@ class UniversalAccurateConverter:
                 )
             elif audit_table:
                 msg += f"\n\n{audit_table}"
-            self.show_copyable_dialog("Selesai BCA", msg, path_to_copy=target_dir)
+            self.show_copyable_dialog("Selesai BCA", msg, path_to_copy=result_save_dest)
 
         except Exception as e:
             self.reset_ui_state(is_error=True, error_msg=f"Gagal simpan BCA File: {str(e)}")
