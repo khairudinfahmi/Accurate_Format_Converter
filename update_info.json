@@ -1,5 +1,5 @@
 {
   "latest_version": "5.2.4",
-  "download_url": "https://github.com/khairudinfahmi/Accurate_Format_Converter/releases/download/v5.2.4/Accurate_Converter_Setup_v5.2.4.exe",
+  "download_url": "https://www.dropbox.com/scl/fi/6lk93euxv5p3f2qb5z9ty/Accurate_Converter_Setup_v5.2.4.exe?rlkey=k91qw5kzkhhlep6h1a9i9zleu&st=yliyunnw&dl=1&ext=.exe",
   "release_notes": "- Tampilan jendela pengaturan ekspor diperbarui lebih rapi, stabil, dan seragam dengan tema aplikasi\n- Pilihan tanggal mutasi kini bebas dipilih: bisa pilih 1 tanggal saja atau rentang tanggal mutasi tertentu\n- Disediakan tombol cepat 'Semua Mutasi', 'Tgl 01–15', dan 'Tgl 16–Akhir' agar pembukuan tengah bulan lebih praktis\n- Pilihan tanggal langsung dipilih dari daftar tanggal mutasi yang ada, bebas dari salah ketik\n- Jika hanya memilih 1 format file, berkas langsung disimpan tanpa membuat folder baru\n- Perbaikan deteksi tipe dokumen BCA: membedakan e-Statement Tabungan/Giro dan Mutasi Rekening (KlikBCA Bisnis/myBCA)\n- Rekonsiliasi saldo otomatis: saldo awal, mutasi, dan saldo akhir dihitung ulang dan dijamin tetap klop (selisih Rp 0,00)\n- Bank BCA otomatis menjadi pilihan default saat aplikasi dibuka"
 }
