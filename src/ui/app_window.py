@@ -22,7 +22,7 @@ from processors.bca_processor import process_bca
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        version_str = "5.2.0"
+        version_str = "5.2.1"
         try:
             exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             v_path = os.path.join(exe_dir, "version.txt")
@@ -475,18 +475,32 @@ class UniversalAccurateConverter:
             return None
 
         result = {}
-        min_date = min(tx_dates)
-        max_date = max(tx_dates)
+        unique_dates = sorted(list(set(tx_dates)))
+        date_options = [d.strftime("%d/%m/%Y") for d in unique_dates]
+        date_lookup = {d.strftime("%d/%m/%Y"): d for d in unique_dates}
+
+        min_date = unique_dates[0]
+        max_date = unique_dates[-1]
 
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Pengaturan Hasil Konversi")
-        dialog.geometry("550x530")
+        dialog.geometry("560x570")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
+
+        # Atur Icon Window (Rensa Logo) agar tidak memakai icon default Tkinter
+        if hasattr(self, 'icon_path') and os.path.exists(self.icon_path):
+            try:
+                dialog.iconbitmap(self.icon_path)
+            except Exception:
+                pass
+            dialog.after(100, lambda: dialog.iconbitmap(self.icon_path))
+            dialog.after(300, lambda: dialog.iconbitmap(self.icon_path))
+
         dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() - 550) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - 530) // 2
+        x = self.root.winfo_x() + (self.root.winfo_width() - 560) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 570) // 2
         dialog.geometry(f"+{max(0,x)}+{max(0,y)}")
 
         main_f = ctk.CTkFrame(dialog, fg_color="transparent")
@@ -497,35 +511,122 @@ class UniversalAccurateConverter:
                      font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
                      text_color=("#1A1F36", "#F7FAFC")).pack(anchor="w")
         ctk.CTkLabel(main_f,
-                     text=f"Data tersedia: {min_date.strftime('%d/%m/%Y')} — {max_date.strftime('%d/%m/%Y')}  ({total_count} transaksi)",
+                     text=f"Data tersedia: {date_options[0]} — {date_options[-1]}  ({total_count} transaksi)",
                      font=ctk.CTkFont(family="Inter", size=12),
-                     text_color=("#8792A2", "#A0AABF")).pack(anchor="w", pady=(2, 10))
+                     text_color=("#8792A2", "#A0AABF")).pack(anchor="w", pady=(2, 8))
 
+        from_var = tk.StringVar(value=date_options[0])
+        to_var = tk.StringVar(value=date_options[-1])
+
+        # Modern Quick Preset Chips (Pilihan Cepat 2026)
+        preset_frame = ctk.CTkFrame(main_f, fg_color="transparent")
+        preset_frame.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(preset_frame, text="Pilihan Cepat:",
+                     font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                     text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 8))
+
+        # Dropdowns Frame (Dari & Sampai)
         date_frame = ctk.CTkFrame(main_f, fg_color="transparent")
-        date_frame.pack(fill="x", pady=(0, 15))
+        date_frame.pack(fill="x", pady=(0, 12))
+
         ctk.CTkLabel(date_frame, text="Dari:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
                      text_color=("#4F566B", "#D3D9E6")).pack(side="left")
-        from_var = tk.StringVar(value=min_date.strftime("%d/%m/%Y"))
-        from_entry = ctk.CTkEntry(date_frame, textvariable=from_var, width=130, height=36,
-                                  font=ctk.CTkFont(family="Consolas", size=13),
-                                  border_color=("#E5E9F2", "#4A5568"), border_width=2,
-                                  fg_color=("#F9FAFB", "#2D3748"), corner_radius=8)
-        from_entry.pack(side="left", padx=(8, 20))
+
+        # Function to update count label dynamically
+        def update_count():
+            fd = date_lookup.get(from_var.get(), min_date)
+            td = date_lookup.get(to_var.get(), max_date)
+            cnt = sum(1 for d in tx_dates if fd <= d <= td)
+            pct = (cnt / total_count * 100) if total_count > 0 else 0
+            count_label.configure(
+                text=f"Transaksi yang akan diekspor: {cnt} dari {total_count} ({pct:.1f}%)",
+                text_color=("#10B981", "#10B981") if cnt > 0 else ("#EF4444", "#EF4444")
+            )
+
+        def on_from_select(choice):
+            from_var.set(choice)
+            if date_lookup[choice] > date_lookup[to_var.get()]:
+                to_var.set(choice)
+            update_count()
+
+        def on_to_select(choice):
+            to_var.set(choice)
+            if date_lookup[choice] < date_lookup[from_var.get()]:
+                from_var.set(choice)
+            update_count()
+
+        from_menu = ctk.CTkOptionMenu(
+            date_frame, values=date_options, variable=from_var, command=on_from_select,
+            width=140, height=36,
+            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
+            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
+            fg_color=("#E3E8EE", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
+            button_hover_color=("#94A3B8", "#718096"), text_color=("#1A202C", "#F7FAFC"),
+            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
+        )
+        from_menu.pack(side="left", padx=(8, 20))
+
         ctk.CTkLabel(date_frame, text="Sampai:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
                      text_color=("#4F566B", "#D3D9E6")).pack(side="left")
-        to_var = tk.StringVar(value=max_date.strftime("%d/%m/%Y"))
-        to_entry = ctk.CTkEntry(date_frame, textvariable=to_var, width=130, height=36,
-                                font=ctk.CTkFont(family="Consolas", size=13),
-                                border_color=("#E5E9F2", "#4A5568"), border_width=2,
-                                fg_color=("#F9FAFB", "#2D3748"), corner_radius=8)
-        to_entry.pack(side="left", padx=(8, 0))
+
+        to_menu = ctk.CTkOptionMenu(
+            date_frame, values=date_options, variable=to_var, command=on_to_select,
+            width=140, height=36,
+            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
+            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
+            fg_color=("#E3E8EE", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
+            button_hover_color=("#94A3B8", "#718096"), text_color=("#1A202C", "#F7FAFC"),
+            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
+        )
+        to_menu.pack(side="left", padx=(8, 0))
+
+        def set_preset_all():
+            from_var.set(date_options[0])
+            to_var.set(date_options[-1])
+            update_count()
+
+        def set_preset_p1():
+            p1 = [d for d in unique_dates if d.day <= 15]
+            if p1:
+                from_var.set(p1[0].strftime("%d/%m/%Y"))
+                to_var.set(p1[-1].strftime("%d/%m/%Y"))
+                update_count()
+
+        def set_preset_p2():
+            p2 = [d for d in unique_dates if d.day >= 16]
+            if p2:
+                from_var.set(p2[0].strftime("%d/%m/%Y"))
+                to_var.set(p2[-1].strftime("%d/%m/%Y"))
+                update_count()
+
+        ctk.CTkButton(preset_frame, text="Semua Mutasi", height=28, width=105,
+                      font=ctk.CTkFont(family="Inter", size=11, weight="bold"),
+                      fg_color=("#3B82F6", "#2563EB"), hover_color=("#2563EB", "#1D4ED8"),
+                      text_color="white", corner_radius=6, command=set_preset_all).pack(side="left", padx=(0, 6))
+
+        if any(d.day <= 15 for d in unique_dates):
+            ctk.CTkButton(preset_frame, text="Tgl 01–15", height=28, width=85,
+                          font=ctk.CTkFont(family="Inter", size=11),
+                          fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
+                          text_color=("#4F566B", "#D3D9E6"), corner_radius=6, command=set_preset_p1).pack(side="left", padx=(0, 6))
+
+        if any(d.day >= 16 for d in unique_dates):
+            ctk.CTkButton(preset_frame, text="Tgl 16–Akhir", height=28, width=95,
+                          font=ctk.CTkFont(family="Inter", size=11),
+                          fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
+                          text_color=("#4F566B", "#D3D9E6"), corner_radius=6, command=set_preset_p2).pack(side="left", padx=(0, 6))
 
         ctk.CTkFrame(main_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=10)
 
         # === SECTION 2: TEMPLATE SELECTION ===
-        ctk.CTkLabel(main_f, text="PILIH TEMPLATE OUTPUT",
+        tmpl_header = ctk.CTkFrame(main_f, fg_color="transparent")
+        tmpl_header.pack(fill="x", pady=(0, 8))
+
+        ctk.CTkLabel(tmpl_header, text="PILIH TEMPLATE OUTPUT",
                      font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
-                     text_color=("#1A1F36", "#F7FAFC")).pack(anchor="w", pady=(0, 8))
+                     text_color=("#1A1F36", "#F7FAFC")).pack(side="left")
+
         if bank == "BCA":
             template_names = [
                 "1. Template AOL Format JSON (.json)  [Rekomendasi]",
@@ -538,55 +639,67 @@ class UniversalAccurateConverter:
                 "1. Template AOL Format JSON (.json)  [Rekomendasi]",
                 "2. Template AOL Format Excel Non-JSON (.xls)"
             ]
+
         chk_vars = []
+        chk_widgets = []
+
+        def on_chk_click():
+            any_off = any(v.get() == 0 for v in chk_vars)
+            btn_toggle_tmpl.configure(text="Pilih Semua" if all(v.get() == 0 for v in chk_vars) else ("Pilih Semua" if any_off else "Batalkan Semua"))
+
         for name in template_names:
-            var = tk.BooleanVar(value=True)
+            var = tk.IntVar(value=1)
             chk_vars.append(var)
-            ctk.CTkCheckBox(main_f, text=name, variable=var,
-                            font=ctk.CTkFont(family="Inter", size=12),
-                            fg_color=("#3B82F6", "#3B82F6"),
-                            border_color=("#CBD5E1", "#4A5568"),
-                            text_color=("#4F566B", "#A0AABF"),
-                            corner_radius=6).pack(anchor="w", pady=3)
+            chk = ctk.CTkCheckBox(main_f, text=name, variable=var,
+                                  onvalue=1, offvalue=0,
+                                  command=on_chk_click,
+                                  font=ctk.CTkFont(family="Inter", size=12),
+                                  fg_color=("#3B82F6", "#3B82F6"),
+                                  border_color=("#CBD5E1", "#4A5568"),
+                                  text_color=("#4F566B", "#A0AABF"),
+                                  corner_radius=6)
+            chk.pack(anchor="w", pady=3)
+            chk.select()
+            chk_widgets.append(chk)
+
+        def toggle_all_templates():
+            any_off = any(v.get() == 0 for v in chk_vars)
+            for c in chk_widgets:
+                if any_off:
+                    c.select()
+                else:
+                    c.deselect()
+            btn_toggle_tmpl.configure(text="Batalkan Semua" if any_off else "Pilih Semua")
+
+        btn_toggle_tmpl = ctk.CTkButton(tmpl_header, text="Batalkan Semua", height=24, width=95,
+                                        font=ctk.CTkFont(family="Inter", size=11),
+                                        fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
+                                        text_color=("#4F566B", "#D3D9E6"), corner_radius=6,
+                                        command=toggle_all_templates)
+        btn_toggle_tmpl.pack(side="right")
 
         ctk.CTkFrame(main_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=10)
 
         # === SECTION 3: LIVE COUNT ===
         count_label = ctk.CTkLabel(main_f,
-                                   text=f"Transaksi yang akan diekspor: {total_count} dari {total_count}",
+                                   text=f"Transaksi yang akan diekspor: {total_count} dari {total_count} (100.0%)",
                                    font=ctk.CTkFont(family="Inter", size=13, weight="bold"),
                                    text_color=("#10B981", "#10B981"))
         count_label.pack(anchor="w", pady=(0, 15))
-
-        def update_count(*args):
-            try:
-                fd = datetime.datetime.strptime(from_var.get().strip(), "%d/%m/%Y").date()
-                td = datetime.datetime.strptime(to_var.get().strip(), "%d/%m/%Y").date()
-                cnt = sum(1 for d in tx_dates if fd <= d <= td)
-                count_label.configure(
-                    text=f"Transaksi yang akan diekspor: {cnt} dari {total_count}",
-                    text_color=("#10B981", "#10B981") if cnt > 0 else ("#EF4444", "#EF4444"))
-            except ValueError:
-                count_label.configure(text="Format tanggal tidak valid (DD/MM/YYYY)",
-                                      text_color=("#EF4444", "#EF4444"))
-        from_var.trace_add("write", update_count)
-        to_var.trace_add("write", update_count)
 
         # === BUTTONS ===
         btn_frame = ctk.CTkFrame(main_f, fg_color="transparent")
         btn_frame.pack(fill="x")
 
         def on_save():
-            selected = [i for i, v in enumerate(chk_vars) if v.get()]
+            selected = [i for i, v in enumerate(chk_vars) if v.get() == 1]
             if not selected:
                 messagebox.showwarning("Peringatan", "Pilih minimal satu template output.", parent=dialog)
                 return
-            try:
-                fd = datetime.datetime.strptime(from_var.get().strip(), "%d/%m/%Y").date()
-                td = datetime.datetime.strptime(to_var.get().strip(), "%d/%m/%Y").date()
-            except ValueError:
-                messagebox.showwarning("Format Tanggal Salah",
-                                       "Format tanggal harus DD/MM/YYYY.\nContoh: 01/10/2026", parent=dialog)
+            fd = date_lookup.get(from_var.get())
+            td = date_lookup.get(to_var.get())
+            if not fd or not td:
+                messagebox.showwarning("Peringatan", "Pilih tanggal yang valid.", parent=dialog)
                 return
             if fd > td:
                 messagebox.showwarning("Rentang Tidak Valid",
