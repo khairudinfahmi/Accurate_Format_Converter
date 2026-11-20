@@ -712,8 +712,8 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
             self.assertNotIn("SALDO AKHIR", desc)
             self.assertNotIn("Bersambung ke", desc)
 
-    def test_panin_dummy_rows_are_blank(self):
-        """Verifikasi bahwa 7 baris dummy di awal DataFrame Panin murni berupa string kosong tanpa nominal."""
+    def test_panin_dummy_rows_looping(self):
+        """Verifikasi bahwa 7 baris dummy di awal DataFrame Panin merupakan perulangan (looping) transaksi."""
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', encoding='utf-8') as f:
             f.write("TANGGAL,DESKRIPSI,DEBET,KREDIT,SALDO\n")
             f.write("01/01/2026,SALDO AWAL DUMMY,,10000000,10000000\n")
@@ -732,11 +732,9 @@ class TestBalanceMathAndDirectionGuard(unittest.TestCase):
             
             df_out, dummy = results[0]
             self.assertEqual(dummy, 7)
-            # Pastikan ke-7 baris dummy kolom debet, kredit, saldo bernilai kosong
+            # Pastikan 7 baris dummy berisi transaksi looping (modulo)
             for i in range(dummy):
-                self.assertEqual(df_out.iloc[i][OUTPUT_COLUMNS['deb']], "")
-                self.assertEqual(df_out.iloc[i][OUTPUT_COLUMNS['kre']], "")
-                self.assertEqual(df_out.iloc[i][OUTPUT_COLUMNS['bal']], "")
+                self.assertTrue(df_out.iloc[i][OUTPUT_COLUMNS['desc']] in ["SALDO AWAL DUMMY", "UANG MASUK"])
         finally:
             if os.path.exists(f_path):
                 os.remove(f_path)

@@ -358,15 +358,15 @@ def process_panin(filepath, use_regex, log_callback, progress_callback, success_
             out_count_total = len(df_final)
 
             num_dummy = 7
-            dummy_rows = [{
-                OUTPUT_COLUMNS['tgl']: '',
-                OUTPUT_COLUMNS['desc']: '',
-                OUTPUT_COLUMNS['deb']: '',
-                OUTPUT_COLUMNS['kre']: '',
-                OUTPUT_COLUMNS['bal']: ''
-            } for _ in range(num_dummy)]
-            df_dummy = pd.DataFrame(dummy_rows)
-            log_callback(f"Menambahkan {num_dummy} baris kosong (Dummy Format Accurate).")
+            # Loop ulang data transaksi sampai genap 7 baris
+            if len(df_final) >= num_dummy:
+                df_dummy = df_final.iloc[:num_dummy].copy()
+            else:
+                rows = []
+                for i in range(num_dummy):
+                    rows.append(df_final.iloc[i % len(df_final)].to_dict())
+                df_dummy = pd.DataFrame(rows)
+            log_callback(f"Menambahkan {num_dummy} baris dummy (Looping Transaksi Format Accurate).")
             
             drop_cols = ['real_deb', 'real_kre', 'date_obj', 'baris_no']
             df_dummy = df_dummy.drop(columns=drop_cols, errors='ignore')

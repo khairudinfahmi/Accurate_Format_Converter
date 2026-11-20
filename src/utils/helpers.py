@@ -238,17 +238,5 @@ def format_audit_reconciliation_table(bank_name, source_metrics, output_metrics,
         for note in note_list:
             lines.append(f" * {note}")
 
-    lines.append(sep)
-    lines.append(" Panduan Penting Konteks \"Klop\" & Rekomendasi Format:")
-    lines.append(" 1. Arti \"Klop\" Konversi File (Bukan Buku Besar Accurate):")
-    lines.append("    Status [Cocok / Klop] membuktikan file hasil konversi sudah 100% identik dengan file")
-    lines.append("    asli tarikan bank (tidak ada mutasi terlewat & nominal tidak rusak). Pencocokan jurnal")
-    lines.append("    akuntansi tetap dilakukan di menu Rekonsiliasi Bank Accurate Online setelah diimpor.")
-    lines.append(" 2. Sudut Pandang Rekening Koran Bank:")
-    lines.append("    Menggunakan standar bank: Kredit = Uang Masuk (+) dan Debet = Uang Keluar (-).")
-    lines.append("    Format ini sudah tepat untuk menu impor mutasi rekening koran (Smartlink) di Accurate.")
-    lines.append(" 3. Saran Format Paling Stabil (Sangat Disarankan):")
-    lines.append("    Gunakan Template 1 (Format JSON AOL) karena format JSON resmi Accurate Online ini")
-    lines.append("    paling stabil, baku, dan jarang berubah-ubah dibandingkan format laporan perbankan.")
     lines.append(border)
     return "\n".join(lines)
