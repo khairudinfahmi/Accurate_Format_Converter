@@ -1,5 +1,5 @@
 {
   "latest_version": "5.2.0",
-  "download_url": "https://github.com/khairudinfahmi/Accurate_Format_Converter/releases/download/v5.2.0/Accurate_Converter_Setup_v5.2.0.exe",
+  "download_url": "https://www.dropbox.com/scl/fi/ikndb90108zhg9c8777hj/Accurate_Converter_Setup_v5.2.0.exe?rlkey=513zpv6jahswx6j6bpxyvpisd&st=pblvllbe&dl=1&ext=.exe",
   "release_notes": "Pembaruan v5.2.0:\n- Filter Rentang Tanggal Fleksibel: Pengguna kini bebas memilih tanggal mulai dan tanggal akhir mutasi yang ingin diekspor (tidak harus sebulan penuh).\n- Pilihan Template Output: Pengguna dapat memilih template mana saja yang ingin disimpan (JSON AOL, Excel Non-JSON, CSV Tahapan, atau CSV Giro) tanpa menghasilkan berkas yang tidak dibutuhkan.\n- Rekonsiliasi Saldo Sub-Range Otomatis: Saldo awal dan saldo akhir otomatis dihitung ulang dan dijamin klop 100% tanpa selisih (Rp 0,00) sesuai rentang tanggal yang dipilih.\n- Antarmuka Lebih Ringkas: Bank BCA kini otomatis menjadi pilihan utama saat aplikasi dibuka, dan menu disederhanakan murni untuk operasional BCA dan Panin."
 }
