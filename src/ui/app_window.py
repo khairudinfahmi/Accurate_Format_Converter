@@ -22,7 +22,7 @@ from processors.bca_processor import process_bca
 class UniversalAccurateConverter:
     def __init__(self, root):
         self.root = root
-        version_str = "5.2.2"
+        version_str = "5.2.3"
         try:
             exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
             v_path = os.path.join(exe_dir, "version.txt")
@@ -678,8 +678,8 @@ class UniversalAccurateConverter:
             template_names = [
                 "1. Template AOL Format JSON (.json)  [Rekomendasi]",
                 "2. Template AOL Format Excel Non-JSON (.xls)",
-                "3. Template Rekening Tahapan (.csv)",
-                "4. Template Rekening Giro / KlikBCA (.csv)"
+                "3. Template CSV Rekening Tahapan (.csv)",
+                "4. Template CSV Rekening Giro / KlikBCA (.csv)"
             ]
         else:
             template_names = [

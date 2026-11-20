@@ -723,16 +723,24 @@ def _process_bca_excel(filepath, log_callback, progress_callback, success_callba
 
 def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, success_callback, error_callback):
     try:
+        page0 = pdf.pages[0]
+        text0 = page0.extract_text() or ""
+        upper0 = text0.upper()
+
+        is_giro_acc = "GIRO" in upper0
+        is_tahapan_acc = "TAHAPAN" in upper0
+        account_type_str = "Giro" if (is_giro_acc and not is_tahapan_acc) else ("Tahapan" if is_tahapan_acc else "")
+
+        doc_name = f"BCA Mutasi Rekening {account_type_str}".strip() if account_type_str else "BCA Mutasi Rekening"
+        doc_full_label = f"BCA Mutasi Rekening ({account_type_str + ' - ' if account_type_str else ''}KlikBCA Bisnis / myBCA)"
+
         log_callback("-" * 45)
-        log_callback("Memulai proses konversi BCA (Format Giro / myBCA / KlikBCA)...")
+        log_callback(f"Memulai proses konversi {doc_full_label}...")
         log_callback("-" * 45)
         progress_callback(0.1)
 
         total_pages = len(pdf.pages)
         log_callback(f"PDF terdeteksi: {total_pages} halaman.")
-
-        page0 = pdf.pages[0]
-        text0 = page0.extract_text() or ""
         
         rekening = "1234567890"
         nama = "NASABAH BCA"
@@ -915,7 +923,7 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
         # Validasi Rekonsiliasi Otomatis terhadap Ringkasan Bank
         from utils.helpers import format_audit_reconciliation_table
         source_summary = {
-            "label": "Ringkasan myBCA / KlikBCA",
+            "label": f"Ringkasan Mutasi {account_type_str}".strip() if account_type_str else "Ringkasan myBCA / KlikBCA",
             "saldo_awal": saldo_awal,
             "debet": mutasi_debit_summary if mutasi_debit_summary is not None else total_debet,
             "kredit": mutasi_kredit_summary if mutasi_kredit_summary is not None else total_kredit,
@@ -934,7 +942,7 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
             "count_kre": out_count_kre,
             "count": valid_count
         }
-        audit_table = format_audit_reconciliation_table("BCA Giro", source_summary, output_summary)
+        audit_table = format_audit_reconciliation_table(doc_name, source_summary, output_summary)
         log_callback("\n" + audit_table)
         transactions[0]["_audit_table"] = audit_table
         
@@ -949,8 +957,29 @@ def _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, succes
 
 def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, success_callback, error_callback):
     try:
+        basename = os.path.basename(filepath)
+        page0 = pdf.pages[0]
+        text0 = page0.extract_text() or ""
+        upper0 = text0.upper()
+
+        is_giro_acc = "REKENING GIRO" in upper0 or ("GIRO" in upper0 and "TAHAPAN" not in upper0)
+        is_tahapan_acc = "REKENING TAHAPAN" in upper0 or ("TAHAPAN" in upper0 and "GIRO" not in upper0)
+        
+        if is_giro_acc:
+            doc_type_label = "BCA e-Statement (Rekening Giro)"
+            table_type_label = "BCA e-Statement Giro"
+            ringkasan_label = "Ringkasan e-Statement Giro"
+        elif is_tahapan_acc:
+            doc_type_label = "BCA e-Statement (Rekening Tahapan)"
+            table_type_label = "BCA e-Statement Tahapan"
+            ringkasan_label = "Ringkasan e-Statement Tahapan"
+        else:
+            doc_type_label = "BCA e-Statement (Tabungan / Giro)"
+            table_type_label = "BCA e-Statement"
+            ringkasan_label = "Ringkasan e-Statement BCA"
+
         log_callback("-" * 45)
-        log_callback("Memulai proses konversi BCA (Format Tahapan / Individu)...")
+        log_callback(f"Memulai proses konversi {doc_type_label}...")
         log_callback("-" * 45)
         progress_callback(0.1)
 
@@ -963,10 +992,6 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
         
         total_pages = len(pdf.pages)
         log_callback(f"PDF terdeteksi: {total_pages} halaman.")
-        
-        basename = os.path.basename(filepath)
-        page0 = pdf.pages[0]
-        text0 = page0.extract_text() or ""
         
         # 1. Ekstraksi Nomor Rekening (dengan toleransi kerning spasi renggang & fallback nama file)
         rek_m = re.search(r'NO\.?\s*REKENING\s*:\s*(\d+)', text0, re.IGNORECASE)
@@ -1177,7 +1202,7 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
 
         from utils.helpers import format_audit_reconciliation_table
         source_summary = {
-            "label": "Ringkasan BCA Tahapan",
+            "label": ringkasan_label,
             "saldo_awal": saldo_awal,
             "debet": mutasi_db_sum if mutasi_db_sum is not None else total_debet,
             "kredit": mutasi_cr_sum if mutasi_cr_sum is not None else total_kredit,
@@ -1196,7 +1221,7 @@ def _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, suc
             "count_kre": out_count_kre,
             "count": valid_count
         }
-        audit_table = format_audit_reconciliation_table("BCA Tahapan", source_summary, output_summary)
+        audit_table = format_audit_reconciliation_table(table_type_label, source_summary, output_summary)
         log_callback("\n" + audit_table)
         transactions[0]["_audit_table"] = audit_table
         
@@ -1233,9 +1258,19 @@ def process_bca(filepath, log_callback, progress_callback, success_callback, err
             text0 = page0.extract_text() or ""
             upper0 = text0.upper()
             
-            is_giro = "DETAIL MUTASI" in upper0 or ("DEBIT" in upper0 and "KREDIT" in upper0 and "NO REFERENSI" in upper0) or "JENIS REKENING GIRO" in upper0
+            # Deteksi arsitektur tata letak (layout) dokumen PDF:
+            # 1. Mutasi Rekening Multi-Kolom (KlikBCA Bisnis / myBCA):
+            #    Mempunyai baris Detail Mutasi, kolom No Referensi, Tanggal Efektif & Transaksi terpisah.
+            # 2. e-Statement Bulanan Resmi (5-Kolom: Tanggal | Keterangan | CBG | Mutasi | Saldo):
+            #    Diterbitkan baik untuk Rekening Giro maupun Rekening Tahapan.
+            is_multi_column = (
+                "DETAIL MUTASI" in upper0 or 
+                ("DEBIT" in upper0 and "KREDIT" in upper0 and "NO REFERENSI" in upper0) or 
+                ("TANGGAL EFEKTIF" in upper0 and "TANGGAL TRANSAKSI" in upper0) or
+                ("MUTASI REKENING" in upper0 and "NO REFERENSI" in upper0)
+            )
             
-            if is_giro:
+            if is_multi_column:
                 _process_bca_giro_pdf(pdf, filepath, log_callback, progress_callback, success_callback, error_callback)
             else:
                 _process_bca_tahapan_pdf(pdf, filepath, log_callback, progress_callback, success_callback, error_callback)

@@ -33,22 +33,28 @@ def detect_bank_from_file(filepath: str) -> tuple[str | None, str]:
                 upper = full_text.upper()
 
                 # --- A. DETEKSI TANDA TANGAN BCA (GIRO & TAHAPAN) ---
-                is_bca_giro = (
+                is_bca_multi_column = (
                     ("DETAIL MUTASI" in upper and "NO REFERENSI" in upper) or
                     ("KEY BCA" in upper) or
-                    ("JENIS REKENING GIRO" in upper) or
-                    ("TANGGAL EFEKTIF" in upper and "TANGGAL TRANSAKSI" in upper and "CABANG" in upper)
+                    ("TANGGAL EFEKTIF" in upper and "TANGGAL TRANSAKSI" in upper and "CABANG" in upper) or
+                    ("MUTASI REKENING" in upper and "NO REFERENSI" in upper)
                 )
-                is_bca_tahapan = (
+                is_bca_statement = (
                     ("TANGGAL KETERANGAN CBG MUTASI SALDO" in upper) or
                     ("MUTASI CR :" in upper and "SALDO AWAL :" in upper) or
                     ("MUTASI CR" in upper and "MUTASI DB" in upper and "SALDO AKHIR" in upper) or
-                    ("BCA" in upper and "SALDO AWAL" in upper and "CBG" in upper)
+                    ("BCA" in upper and "SALDO AWAL" in upper and "CBG" in upper) or
+                    ("REKENING GIRO" in upper or "REKENING TAHAPAN" in upper)
                 )
                 is_bca_general = "BANK CENTRAL ASIA" in upper or "KLIKBCA" in upper or "WWW.KLIKBCA.COM" in upper
 
-                if is_bca_giro or is_bca_tahapan or is_bca_general:
-                    detail = "e-Statement BCA Giro / myBCA / KlikBCA Bisnis" if is_bca_giro else "e-Statement BCA Tahapan"
+                if is_bca_multi_column or is_bca_statement or is_bca_general:
+                    if is_bca_multi_column:
+                        subtype = "Giro" if "GIRO" in upper else ("Tahapan" if "TAHAPAN" in upper else "")
+                        detail = f"BCA Mutasi Rekening {subtype} (KlikBCA Bisnis / myBCA)".replace("  ", " ")
+                    else:
+                        subtype = "Giro" if ("REKENING GIRO" in upper or ("GIRO" in upper and "TAHAPAN" not in upper)) else ("Tahapan" if "TAHAPAN" in upper else "Tahapan / Giro")
+                        detail = f"BCA e-Statement ({subtype})"
                     return "BCA", f"Terdeteksi {detail}"
 
                 # --- B. DETEKSI TANDA TANGAN PANIN ---
