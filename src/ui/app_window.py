@@ -485,7 +485,7 @@ class UniversalAccurateConverter:
 
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Pengaturan Hasil Konversi")
-        dialog.geometry("560x590")
+        dialog.geometry("560x650")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
@@ -501,276 +501,21 @@ class UniversalAccurateConverter:
 
         dialog.update_idletasks()
         x = self.root.winfo_x() + (self.root.winfo_width() - 560) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - 590) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 650) // 2
         dialog.geometry(f"+{max(0,x)}+{max(0,y)}")
 
-        main_f = ctk.CTkFrame(dialog, fg_color="transparent")
-        main_f.pack(fill="both", expand=True, padx=25, pady=20)
+        # Frame Card Utama (Seragam dengan tampilan dan border kartu aplikasi utama)
+        card = ctk.CTkFrame(dialog, corner_radius=16, border_width=1,
+                            border_color=("#E5E9F2", "#2D3748"),
+                            fg_color=("#FFFFFF", "#1E1E1E"))
+        card.pack(fill="both", expand=True, padx=16, pady=16)
 
-        # === SECTION 1: DATE SELECTION ===
-        ctk.CTkLabel(main_f, text="RENTANG TANGGAL",
-                     font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
-                     text_color=("#1A1F36", "#F7FAFC")).pack(anchor="w")
-        ctk.CTkLabel(main_f,
-                     text=f"Data tersedia: {date_options[0]} — {date_options[-1]}  ({total_count} transaksi)",
-                     font=ctk.CTkFont(family="Inter", size=12),
-                     text_color=("#8792A2", "#A0AABF")).pack(anchor="w", pady=(2, 6))
+        content_f = ctk.CTkFrame(card, fg_color="transparent")
+        content_f.pack(fill="both", expand=True, padx=22, pady=20)
 
-        mode_var = tk.StringVar(value="single" if is_single_date_dataset else "range")
-        from_var = tk.StringVar(value=date_options[0])
-        to_var = tk.StringVar(value=date_options[-1])
-        single_var = tk.StringVar(value=date_options[0])
-
-        # Mode Selector (Hanya jika mutasi memiliki lebih dari 1 tanggal)
-        if not is_single_date_dataset:
-            mode_frame = ctk.CTkFrame(main_f, fg_color="transparent")
-            mode_frame.pack(fill="x", pady=(0, 6))
-
-            ctk.CTkLabel(mode_frame, text="Pilih Mode:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
-                         text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 10))
-
-            def on_mode_change():
-                if mode_var.get() == "single":
-                    range_container.pack_forget()
-                    single_container.pack(fill="x", pady=(0, 8))
-                else:
-                    single_container.pack_forget()
-                    range_container.pack(fill="x", pady=(0, 8))
-                update_count()
-
-            ctk.CTkRadioButton(mode_frame, text="Rentang Tanggal", variable=mode_var, value="range",
-                               command=on_mode_change, font=ctk.CTkFont(family="Inter", size=12),
-                               fg_color=("#3B82F6", "#2563EB"), text_color=("#1A1F36", "#F7FAFC")).pack(side="left", padx=(0, 15))
-            ctk.CTkRadioButton(mode_frame, text="Satu Tanggal Saja", variable=mode_var, value="single",
-                               command=on_mode_change, font=ctk.CTkFont(family="Inter", size=12),
-                               fg_color=("#3B82F6", "#2563EB"), text_color=("#1A1F36", "#F7FAFC")).pack(side="left")
-
-        # Container 1: Mode Rentang Tanggal (Presets + 2 Dropdown)
-        range_container = ctk.CTkFrame(main_f, fg_color="transparent")
-
-        preset_frame = ctk.CTkFrame(range_container, fg_color="transparent")
-        preset_frame.pack(fill="x", pady=(0, 8))
-
-        ctk.CTkLabel(preset_frame, text="Pilihan Cepat:",
-                     font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
-                     text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 8))
-
-        # Dropdowns Frame (Dari & Sampai)
-        date_frame = ctk.CTkFrame(range_container, fg_color="transparent")
-        date_frame.pack(fill="x", pady=(0, 4))
-
-        ctk.CTkLabel(date_frame, text="Dari:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
-                     text_color=("#4F566B", "#D3D9E6")).pack(side="left")
-
-        def on_from_select(choice):
-            from_var.set(choice)
-            if date_lookup[choice] > date_lookup[to_var.get()]:
-                to_var.set(choice)
-            update_count()
-
-        def on_to_select(choice):
-            to_var.set(choice)
-            if date_lookup[choice] < date_lookup[from_var.get()]:
-                from_var.set(choice)
-            update_count()
-
-        from_menu = ctk.CTkOptionMenu(
-            date_frame, values=date_options, variable=from_var, command=on_from_select,
-            width=140, height=36,
-            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
-            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
-            fg_color=("#E3E8EE", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
-            button_hover_color=("#94A3B8", "#718096"), text_color=("#1A202C", "#F7FAFC"),
-            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
-        )
-        from_menu.pack(side="left", padx=(8, 20))
-
-        ctk.CTkLabel(date_frame, text="Sampai:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
-                     text_color=("#4F566B", "#D3D9E6")).pack(side="left")
-
-        to_menu = ctk.CTkOptionMenu(
-            date_frame, values=date_options, variable=to_var, command=on_to_select,
-            width=140, height=36,
-            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
-            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
-            fg_color=("#E3E8EE", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
-            button_hover_color=("#94A3B8", "#718096"), text_color=("#1A202C", "#F7FAFC"),
-            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
-        )
-        to_menu.pack(side="left", padx=(8, 0))
-
-        def set_preset_all():
-            from_var.set(date_options[0])
-            to_var.set(date_options[-1])
-            update_count()
-
-        def set_preset_p1():
-            p1 = [d for d in unique_dates if d.day <= 15]
-            if p1:
-                from_var.set(p1[0].strftime("%d/%m/%Y"))
-                to_var.set(p1[-1].strftime("%d/%m/%Y"))
-                update_count()
-
-        def set_preset_p2():
-            p2 = [d for d in unique_dates if d.day >= 16]
-            if p2:
-                from_var.set(p2[0].strftime("%d/%m/%Y"))
-                to_var.set(p2[-1].strftime("%d/%m/%Y"))
-                update_count()
-
-        ctk.CTkButton(preset_frame, text="Semua Mutasi", height=28, width=105,
-                      font=ctk.CTkFont(family="Inter", size=11, weight="bold"),
-                      fg_color=("#3B82F6", "#2563EB"), hover_color=("#2563EB", "#1D4ED8"),
-                      text_color="white", corner_radius=6, command=set_preset_all).pack(side="left", padx=(0, 6))
-
-        if any(d.day <= 15 for d in unique_dates):
-            ctk.CTkButton(preset_frame, text="Tgl 01–15", height=28, width=85,
-                          font=ctk.CTkFont(family="Inter", size=11),
-                          fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
-                          text_color=("#4F566B", "#D3D9E6"), corner_radius=6, command=set_preset_p1).pack(side="left", padx=(0, 6))
-
-        if any(d.day >= 16 for d in unique_dates):
-            ctk.CTkButton(preset_frame, text="Tgl 16–Akhir", height=28, width=95,
-                          font=ctk.CTkFont(family="Inter", size=11),
-                          fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
-                          text_color=("#4F566B", "#D3D9E6"), corner_radius=6, command=set_preset_p2).pack(side="left", padx=(0, 6))
-
-        # Container 2: Mode Satu Tanggal Saja (Hanya 1 Dropdown)
-        single_container = ctk.CTkFrame(main_f, fg_color="transparent")
-        single_row = ctk.CTkFrame(single_container, fg_color="transparent")
-        single_row.pack(fill="x", pady=(0, 4))
-
-        ctk.CTkLabel(single_row, text="Pilih Tanggal:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
-                     text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 10))
-
-        def on_single_select(choice):
-            single_var.set(choice)
-            update_count()
-
-        single_menu = ctk.CTkOptionMenu(
-            single_row, values=date_options, variable=single_var, command=on_single_select,
-            width=160, height=36,
-            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
-            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
-            fg_color=("#E3E8EE", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
-            button_hover_color=("#94A3B8", "#718096"), text_color=("#1A202C", "#F7FAFC"),
-            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
-        )
-        single_menu.pack(side="left")
-
-        # Initial layout pack
-        if is_single_date_dataset:
-            single_container.pack(fill="x", pady=(0, 8))
-        else:
-            range_container.pack(fill="x", pady=(0, 8))
-
-        ctk.CTkFrame(main_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=10)
-
-        # === SECTION 2: TEMPLATE SELECTION ===
-        tmpl_header = ctk.CTkFrame(main_f, fg_color="transparent")
-        tmpl_header.pack(fill="x", pady=(0, 8))
-
-        ctk.CTkLabel(tmpl_header, text="PILIH TEMPLATE OUTPUT",
-                     font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
-                     text_color=("#1A1F36", "#F7FAFC")).pack(side="left")
-
-        if bank == "BCA":
-            template_names = [
-                "1. Template AOL Format JSON (.json)  [Rekomendasi]",
-                "2. Template AOL Format Excel Non-JSON (.xls)",
-                "3. Template CSV Rekening Tahapan (.csv)",
-                "4. Template CSV Rekening Giro / KlikBCA (.csv)"
-            ]
-        else:
-            template_names = [
-                "1. Template AOL Format JSON (.json)  [Rekomendasi]",
-                "2. Template AOL Format Excel Non-JSON (.xls)"
-            ]
-
-        chk_vars = []
-        chk_widgets = []
-
-        tmpl_hint_label = ctk.CTkLabel(main_f, text="", font=ctk.CTkFont(family="Inter", size=11))
-
-        def update_tmpl_hint():
-            sel_cnt = sum(1 for v in chk_vars if v.get() == 1)
-            if sel_cnt == 1:
-                tmpl_hint_label.configure(text="💡 1 template dipilih: berkas akan disimpan langsung tanpa membuat folder baru.",
-                                          text_color=("#10B981", "#10B981"))
-            elif sel_cnt > 1:
-                tmpl_hint_label.configure(text=f"💡 {sel_cnt} template dipilih: berkas akan disimpan rapi di dalam satu folder.",
-                                          text_color=("#6B7280", "#9CA3AF"))
-            else:
-                tmpl_hint_label.configure(text="⚠ Pilih minimal satu template output.",
-                                          text_color=("#EF4444", "#EF4444"))
-
-        def on_chk_click():
-            any_off = any(v.get() == 0 for v in chk_vars)
-            btn_toggle_tmpl.configure(text="Pilih Semua" if all(v.get() == 0 for v in chk_vars) else ("Pilih Semua" if any_off else "Batalkan Semua"))
-            update_tmpl_hint()
-
-        for name in template_names:
-            var = tk.IntVar(value=1)
-            chk_vars.append(var)
-            chk = ctk.CTkCheckBox(main_f, text=name, variable=var,
-                                  onvalue=1, offvalue=0,
-                                  command=on_chk_click,
-                                  font=ctk.CTkFont(family="Inter", size=12),
-                                  fg_color=("#3B82F6", "#3B82F6"),
-                                  border_color=("#CBD5E1", "#4A5568"),
-                                  text_color=("#4F566B", "#A0AABF"),
-                                  corner_radius=6)
-            chk.pack(anchor="w", pady=3)
-            chk.select()
-            chk_widgets.append(chk)
-
-        def toggle_all_templates():
-            any_off = any(v.get() == 0 for v in chk_vars)
-            for c in chk_widgets:
-                if any_off:
-                    c.select()
-                else:
-                    c.deselect()
-            btn_toggle_tmpl.configure(text="Batalkan Semua" if any_off else "Pilih Semua")
-            update_tmpl_hint()
-
-        btn_toggle_tmpl = ctk.CTkButton(tmpl_header, text="Batalkan Semua", height=24, width=95,
-                                        font=ctk.CTkFont(family="Inter", size=11),
-                                        fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
-                                        text_color=("#4F566B", "#D3D9E6"), corner_radius=6,
-                                        command=toggle_all_templates)
-        btn_toggle_tmpl.pack(side="right")
-
-        tmpl_hint_label.pack(anchor="w", pady=(4, 0))
-        update_tmpl_hint()
-
-        ctk.CTkFrame(main_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=10)
-
-        # === SECTION 3: LIVE COUNT ===
-        count_label = ctk.CTkLabel(main_f,
-                                   text=f"Transaksi yang akan diekspor: {total_count} dari {total_count} (100.0%)",
-                                   font=ctk.CTkFont(family="Inter", size=13, weight="bold"),
-                                   text_color=("#10B981", "#10B981"))
-        count_label.pack(anchor="w", pady=(0, 15))
-
-        # Function to update count label dynamically
-        def update_count():
-            if mode_var.get() == "single":
-                sel_d = date_lookup.get(single_var.get(), min_date)
-                cnt = sum(1 for d in tx_dates if d == sel_d)
-            else:
-                fd = date_lookup.get(from_var.get(), min_date)
-                td = date_lookup.get(to_var.get(), max_date)
-                cnt = sum(1 for d in tx_dates if fd <= d <= td)
-            pct = (cnt / total_count * 100) if total_count > 0 else 0
-            count_label.configure(
-                text=f"Transaksi yang akan diekspor: {cnt} dari {total_count} ({pct:.1f}%)",
-                text_color=("#10B981", "#10B981") if cnt > 0 else ("#EF4444", "#EF4444")
-            )
-
-        # === BUTTONS ===
-        btn_frame = ctk.CTkFrame(main_f, fg_color="transparent")
-        btn_frame.pack(fill="x")
+        # === 1. TOMBOL AKSI BAWAH (Dipack side='bottom' permanen agar TIDAK PERNAH terdorong/lompat) ===
+        bottom_bar = ctk.CTkFrame(content_f, fg_color="transparent")
+        bottom_bar.pack(side="bottom", fill="x", pady=(12, 0))
 
         def on_save():
             selected = [i for i, v in enumerate(chk_vars) if v.get() == 1]
@@ -806,14 +551,350 @@ class UniversalAccurateConverter:
         def on_cancel():
             dialog.destroy()
 
-        ctk.CTkButton(btn_frame, text="SIMPAN", width=200, height=42,
-                      font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
-                      fg_color=("#10B981", "#10B981"), hover_color=("#059669", "#059669"),
-                      text_color="white", command=on_save, corner_radius=10).pack(side="left", padx=(0, 15))
-        ctk.CTkButton(btn_frame, text="BATAL", width=120, height=42,
-                      font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
-                      fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
-                      text_color=("#4F566B", "#D3D9E6"), command=on_cancel, corner_radius=10).pack(side="left")
+        btn_save = ctk.CTkButton(
+            bottom_bar, text="SIMPAN", width=190, height=42,
+            font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
+            fg_color=("#10B981", "#10B981"), hover_color=("#059669", "#059669"),
+            text_color="white", command=on_save, corner_radius=10
+        )
+        btn_save.pack(side="left", padx=(0, 12))
+
+        btn_cancel = ctk.CTkButton(
+            bottom_bar, text="BATAL", width=110, height=42,
+            font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
+            fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
+            text_color=("#4F566B", "#D3D9E6"), command=on_cancel, corner_radius=10
+        )
+        btn_cancel.pack(side="left")
+
+        # === 2. KARTU RINGKASAN TRANSAKSI (Permanen di atas tombol aksi) ===
+        counter_card = ctk.CTkFrame(content_f, corner_radius=8,
+                                    fg_color=("#F0FDF4", "#0D281E"),
+                                    border_width=1, border_color=("#BBF7D0", "#065F46"))
+        counter_card.pack(side="bottom", fill="x", pady=(0, 10))
+
+        count_label = ctk.CTkLabel(
+            counter_card,
+            text=f"✔  Transaksi yang akan diekspor: {total_count} dari {total_count} (100.0%)",
+            font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+            text_color=("#059669", "#34D399")
+        )
+        count_label.pack(padx=14, pady=8, anchor="w")
+
+        # === 3. BAGIAN ATAS: FILTER TANGGAL MUTASI ===
+        ctk.CTkLabel(
+            content_f, text="FILTER TANGGAL MUTASI",
+            font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
+            text_color=("#1A1F36", "#F7FAFC")
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            content_f,
+            text=f"Data mutasi tersedia: {date_options[0]} — {date_options[-1]}  ({total_count} transaksi)",
+            font=ctk.CTkFont(family="Inter", size=12),
+            text_color=("#6B7280", "#9CA3AF")
+        ).pack(anchor="w", pady=(2, 8))
+
+        mode_var = tk.StringVar(value="single" if is_single_date_dataset else "range")
+        from_var = tk.StringVar(value=date_options[0])
+        to_var = tk.StringVar(value=date_options[-1])
+        single_var = tk.StringVar(value=date_options[0])
+
+        # Wadah Host Picker Khusus (Menjamin widget tanggal tidak pernah melompat ke bawah)
+        picker_host = ctk.CTkFrame(content_f, fg_color="transparent")
+        range_container = ctk.CTkFrame(picker_host, fg_color="transparent")
+        single_container = ctk.CTkFrame(picker_host, fg_color="transparent")
+
+        def update_count():
+            if mode_var.get() == "single":
+                sel_d = date_lookup.get(single_var.get(), min_date)
+                cnt = sum(1 for d in tx_dates if d == sel_d)
+            else:
+                fd = date_lookup.get(from_var.get(), min_date)
+                td = date_lookup.get(to_var.get(), max_date)
+                cnt = sum(1 for d in tx_dates if fd <= d <= td)
+            pct = (cnt / total_count * 100) if total_count > 0 else 0
+            if cnt > 0:
+                counter_card.configure(fg_color=("#F0FDF4", "#0D281E"), border_color=("#BBF7D0", "#065F46"))
+                count_label.configure(
+                    text=f"✔  Transaksi yang akan diekspor: {cnt} dari {total_count} ({pct:.1f}%)",
+                    text_color=("#059669", "#34D399")
+                )
+            else:
+                counter_card.configure(fg_color=("#FEF2F2", "#3B1212"), border_color=("#FECACA", "#7F1D1D"))
+                count_label.configure(
+                    text="⚠  Tidak ada transaksi pada tanggal yang dipilih (0%)",
+                    text_color=("#DC2626", "#F87171")
+                )
+
+        def on_mode_change():
+            if mode_var.get() == "single":
+                range_container.pack_forget()
+                single_container.pack(fill="x")
+            else:
+                single_container.pack_forget()
+                range_container.pack(fill="x")
+            update_count()
+
+        # Mode Selector (Hanya jika mutasi memiliki lebih dari 1 tanggal)
+        if not is_single_date_dataset:
+            mode_frame = ctk.CTkFrame(content_f, fg_color="transparent")
+            mode_frame.pack(fill="x", pady=(0, 8))
+
+            ctk.CTkLabel(mode_frame, text="Pilih Mode:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                         text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 12))
+
+            rb_range = ctk.CTkRadioButton(
+                mode_frame, text="Rentang Tanggal", variable=mode_var, value="range",
+                command=on_mode_change, font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                fg_color=("#3B82F6", "#2563EB"), text_color=("#1A1F36", "#F7FAFC"),
+                border_color=("#CBD5E1", "#4A5568")
+            )
+            rb_range.pack(side="left", padx=(0, 16))
+
+            rb_single = ctk.CTkRadioButton(
+                mode_frame, text="Satu Tanggal Saja", variable=mode_var, value="single",
+                command=on_mode_change, font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                fg_color=("#3B82F6", "#2563EB"), text_color=("#1A1F36", "#F7FAFC"),
+                border_color=("#CBD5E1", "#4A5568")
+            )
+            rb_single.pack(side="left")
+
+        # Pack picker_host pada urutan terstruktur di content_f
+        picker_host.pack(fill="x", pady=(0, 4))
+
+        # Kontainer Rentang Tanggal (Presets + 2 Dropdown)
+        preset_frame = ctk.CTkFrame(range_container, fg_color="transparent")
+        preset_frame.pack(fill="x", pady=(0, 8))
+
+        ctk.CTkLabel(preset_frame, text="Pilihan Cepat:",
+                     font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                     text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 10))
+
+        def _update_preset_styles(active_key):
+            btn_preset_all.configure(
+                fg_color=("#3B82F6", "#2563EB") if active_key == "all" else ("#E5E9F2", "#2D3748"),
+                text_color="white" if active_key == "all" else ("#4F566B", "#D3D9E6")
+            )
+            if btn_preset_p1:
+                btn_preset_p1.configure(
+                    fg_color=("#3B82F6", "#2563EB") if active_key == "p1" else ("#E5E9F2", "#2D3748"),
+                    text_color="white" if active_key == "p1" else ("#4F566B", "#D3D9E6")
+                )
+            if btn_preset_p2:
+                btn_preset_p2.configure(
+                    fg_color=("#3B82F6", "#2563EB") if active_key == "p2" else ("#E5E9F2", "#2D3748"),
+                    text_color="white" if active_key == "p2" else ("#4F566B", "#D3D9E6")
+                )
+
+        def set_preset_all():
+            from_var.set(date_options[0])
+            to_var.set(date_options[-1])
+            update_count()
+            _update_preset_styles("all")
+
+        def set_preset_p1():
+            p1 = [d for d in unique_dates if d.day <= 15]
+            if p1:
+                from_var.set(p1[0].strftime("%d/%m/%Y"))
+                to_var.set(p1[-1].strftime("%d/%m/%Y"))
+                update_count()
+                _update_preset_styles("p1")
+
+        def set_preset_p2():
+            p2 = [d for d in unique_dates if d.day >= 16]
+            if p2:
+                from_var.set(p2[0].strftime("%d/%m/%Y"))
+                to_var.set(p2[-1].strftime("%d/%m/%Y"))
+                update_count()
+                _update_preset_styles("p2")
+
+        btn_preset_all = ctk.CTkButton(
+            preset_frame, text="Semua Mutasi", height=28, width=105,
+            font=ctk.CTkFont(family="Inter", size=11, weight="bold"),
+            fg_color=("#3B82F6", "#2563EB"), hover_color=("#2563EB", "#1D4ED8"),
+            text_color="white", corner_radius=6, command=set_preset_all
+        )
+        btn_preset_all.pack(side="left", padx=(0, 6))
+
+        btn_preset_p1 = None
+        if any(d.day <= 15 for d in unique_dates):
+            btn_preset_p1 = ctk.CTkButton(
+                preset_frame, text="Tgl 01–15", height=28, width=85,
+                font=ctk.CTkFont(family="Inter", size=11),
+                fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
+                text_color=("#4F566B", "#D3D9E6"), corner_radius=6, command=set_preset_p1
+            )
+            btn_preset_p1.pack(side="left", padx=(0, 6))
+
+        btn_preset_p2 = None
+        if any(d.day >= 16 for d in unique_dates):
+            btn_preset_p2 = ctk.CTkButton(
+                preset_frame, text="Tgl 16–Akhir", height=28, width=95,
+                font=ctk.CTkFont(family="Inter", size=11),
+                fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
+                text_color=("#4F566B", "#D3D9E6"), corner_radius=6, command=set_preset_p2
+            )
+            btn_preset_p2.pack(side="left", padx=(0, 6))
+
+        date_frame = ctk.CTkFrame(range_container, fg_color="transparent")
+        date_frame.pack(fill="x", pady=(0, 2))
+
+        ctk.CTkLabel(date_frame, text="Dari:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                     text_color=("#4F566B", "#D3D9E6")).pack(side="left")
+
+        def on_from_select(choice):
+            from_var.set(choice)
+            if date_lookup[choice] > date_lookup[to_var.get()]:
+                to_var.set(choice)
+            update_count()
+            _update_preset_styles("custom")
+
+        def on_to_select(choice):
+            to_var.set(choice)
+            if date_lookup[choice] < date_lookup[from_var.get()]:
+                from_var.set(choice)
+            update_count()
+            _update_preset_styles("custom")
+
+        from_menu = ctk.CTkOptionMenu(
+            date_frame, values=date_options, variable=from_var, command=on_from_select,
+            width=140, height=36,
+            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
+            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
+            fg_color=("#F1F5F9", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
+            button_hover_color=("#94A3B8", "#718096"), text_color=("#0F172A", "#F8FAFC"),
+            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
+        )
+        from_menu.pack(side="left", padx=(8, 20))
+
+        ctk.CTkLabel(date_frame, text="Sampai:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                     text_color=("#4F566B", "#D3D9E6")).pack(side="left")
+
+        to_menu = ctk.CTkOptionMenu(
+            date_frame, values=date_options, variable=to_var, command=on_to_select,
+            width=140, height=36,
+            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
+            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
+            fg_color=("#F1F5F9", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
+            button_hover_color=("#94A3B8", "#718096"), text_color=("#0F172A", "#F8FAFC"),
+            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
+        )
+        to_menu.pack(side="left", padx=(8, 0))
+
+        # Kontainer Satu Tanggal Saja (Hanya 1 Dropdown)
+        single_row = ctk.CTkFrame(single_container, fg_color="transparent")
+        single_row.pack(fill="x", pady=(2, 4))
+
+        ctk.CTkLabel(single_row, text="Pilih Tanggal:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                     text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 10))
+
+        def on_single_select(choice):
+            single_var.set(choice)
+            update_count()
+
+        single_menu = ctk.CTkOptionMenu(
+            single_row, values=date_options, variable=single_var, command=on_single_select,
+            width=160, height=36,
+            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
+            dropdown_font=ctk.CTkFont(family="Consolas", size=12),
+            fg_color=("#F1F5F9", "#2D3748"), button_color=("#CBD5E1", "#4A5568"),
+            button_hover_color=("#94A3B8", "#718096"), text_color=("#0F172A", "#F8FAFC"),
+            dropdown_fg_color=("#FFFFFF", "#2D3748"), corner_radius=8
+        )
+        single_menu.pack(side="left")
+
+        # Inisialisasi tampilan kontainer tanggal
+        if is_single_date_dataset:
+            single_container.pack(fill="x")
+        else:
+            range_container.pack(fill="x")
+
+        # Pemisah Bagian 1 & 2
+        ctk.CTkFrame(content_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=(10, 10))
+
+        # === 4. BAGIAN KEDUA: PILIH TEMPLATE OUTPUT ===
+        tmpl_header = ctk.CTkFrame(content_f, fg_color="transparent")
+        tmpl_header.pack(fill="x", pady=(0, 6))
+
+        ctk.CTkLabel(tmpl_header, text="PILIH TEMPLATE OUTPUT",
+                     font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
+                     text_color=("#1A1F36", "#F7FAFC")).pack(side="left")
+
+        if bank == "BCA":
+            template_names = [
+                "1. Template AOL Format JSON (.json)  [Rekomendasi]",
+                "2. Template AOL Format Excel Non-JSON (.xls)",
+                "3. Template CSV Rekening Tahapan (.csv)",
+                "4. Template CSV Rekening Giro / KlikBCA (.csv)"
+            ]
+        else:
+            template_names = [
+                "1. Template AOL Format JSON (.json)  [Rekomendasi]",
+                "2. Template AOL Format Excel Non-JSON (.xls)"
+            ]
+
+        chk_vars = []
+        chk_widgets = []
+
+        tmpl_hint_label = ctk.CTkLabel(content_f, text="", font=ctk.CTkFont(family="Inter", size=11))
+
+        def update_tmpl_hint():
+            sel_cnt = sum(1 for v in chk_vars if v.get() == 1)
+            if sel_cnt == 1:
+                tmpl_hint_label.configure(text="💡 1 template dipilih: berkas akan disimpan langsung tanpa membuat folder baru.",
+                                          text_color=("#10B981", "#10B981"))
+            elif sel_cnt > 1:
+                tmpl_hint_label.configure(text=f"💡 {sel_cnt} template dipilih: berkas akan disimpan rapi di dalam satu folder.",
+                                          text_color=("#6B7280", "#9CA3AF"))
+            else:
+                tmpl_hint_label.configure(text="⚠ Pilih minimal satu template output.",
+                                          text_color=("#EF4444", "#EF4444"))
+
+        def on_chk_click():
+            any_off = any(v.get() == 0 for v in chk_vars)
+            btn_toggle_tmpl.configure(text="Pilih Semua" if all(v.get() == 0 for v in chk_vars) else ("Pilih Semua" if any_off else "Batalkan Semua"))
+            update_tmpl_hint()
+
+        def toggle_all_templates():
+            any_off = any(v.get() == 0 for v in chk_vars)
+            for c in chk_widgets:
+                if any_off:
+                    c.select()
+                else:
+                    c.deselect()
+            btn_toggle_tmpl.configure(text="Batalkan Semua" if any_off else "Pilih Semua")
+            update_tmpl_hint()
+
+        btn_toggle_tmpl = ctk.CTkButton(
+            tmpl_header, text="Batalkan Semua", height=24, width=95,
+            font=ctk.CTkFont(family="Inter", size=11),
+            fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
+            text_color=("#4F566B", "#D3D9E6"), corner_radius=6,
+            command=toggle_all_templates
+        )
+        btn_toggle_tmpl.pack(side="right")
+
+        for name in template_names:
+            var = tk.IntVar(value=1)
+            chk_vars.append(var)
+            chk = ctk.CTkCheckBox(content_f, text=name, variable=var,
+                                  onvalue=1, offvalue=0,
+                                  command=on_chk_click,
+                                  font=ctk.CTkFont(family="Inter", size=12),
+                                  fg_color=("#3B82F6", "#3B82F6"),
+                                  border_color=("#CBD5E1", "#4A5568"),
+                                  text_color=("#4F566B", "#A0AABF"),
+                                  corner_radius=6)
+            chk.pack(anchor="w", pady=2.5)
+            chk.select()
+            chk_widgets.append(chk)
+
+        tmpl_hint_label.pack(anchor="w", pady=(4, 0))
+        update_tmpl_hint()
+
+        # Pemisah Bagian 2 & Ringkasan Bawah
+        ctk.CTkFrame(content_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=(10, 10))
 
         dialog.protocol("WM_DELETE_WINDOW", on_cancel)
         dialog.wait_window()
