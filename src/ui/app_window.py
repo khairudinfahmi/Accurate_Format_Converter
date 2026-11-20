@@ -465,91 +465,297 @@ class UniversalAccurateConverter:
             
         self.btn_process.configure(state="normal", text="PROSES DATA")
         
+    def show_export_config_dialog(self, bank, tx_dates, total_count):
+        """
+        Modal dialog: date range filter + template selection.
+        Returns dict with 'date_from', 'date_to' (datetime.date), 'templates' (list of int 0-based)
+        or None if cancelled.
+        """
+        result = {}
+        min_date = min(tx_dates)
+        max_date = max(tx_dates)
+
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("Pengaturan Hasil Konversi")
+        dialog.geometry("540x480")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - 540) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 480) // 2
+        dialog.geometry(f"+{max(0,x)}+{max(0,y)}")
+
+        main_f = ctk.CTkFrame(dialog, fg_color="transparent")
+        main_f.pack(fill="both", expand=True, padx=25, pady=20)
+
+        # === SECTION 1: DATE RANGE ===
+        ctk.CTkLabel(main_f, text="RENTANG TANGGAL",
+                     font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
+                     text_color=("#1A1F36", "#F7FAFC")).pack(anchor="w")
+        ctk.CTkLabel(main_f,
+                     text=f"Data tersedia: {min_date.strftime('%d/%m/%Y')} — {max_date.strftime('%d/%m/%Y')}  ({total_count} transaksi)",
+                     font=ctk.CTkFont(family="Inter", size=12),
+                     text_color=("#8792A2", "#A0AABF")).pack(anchor="w", pady=(2, 10))
+
+        date_frame = ctk.CTkFrame(main_f, fg_color="transparent")
+        date_frame.pack(fill="x", pady=(0, 15))
+        ctk.CTkLabel(date_frame, text="Dari:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                     text_color=("#4F566B", "#D3D9E6")).pack(side="left")
+        from_var = tk.StringVar(value=min_date.strftime("%d/%m/%Y"))
+        from_entry = ctk.CTkEntry(date_frame, textvariable=from_var, width=130, height=36,
+                                  font=ctk.CTkFont(family="Consolas", size=13),
+                                  border_color=("#E5E9F2", "#4A5568"), border_width=2,
+                                  fg_color=("#F9FAFB", "#2D3748"), corner_radius=8)
+        from_entry.pack(side="left", padx=(8, 20))
+        ctk.CTkLabel(date_frame, text="Sampai:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"),
+                     text_color=("#4F566B", "#D3D9E6")).pack(side="left")
+        to_var = tk.StringVar(value=max_date.strftime("%d/%m/%Y"))
+        to_entry = ctk.CTkEntry(date_frame, textvariable=to_var, width=130, height=36,
+                                font=ctk.CTkFont(family="Consolas", size=13),
+                                border_color=("#E5E9F2", "#4A5568"), border_width=2,
+                                fg_color=("#F9FAFB", "#2D3748"), corner_radius=8)
+        to_entry.pack(side="left", padx=(8, 0))
+
+        ctk.CTkFrame(main_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=10)
+
+        # === SECTION 2: TEMPLATE SELECTION ===
+        ctk.CTkLabel(main_f, text="PILIH TEMPLATE OUTPUT",
+                     font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
+                     text_color=("#1A1F36", "#F7FAFC")).pack(anchor="w", pady=(0, 8))
+        if bank == "BCA":
+            template_names = [
+                "1. Template AOL Format JSON (.json)  [Rekomendasi]",
+                "2. Template AOL Format Excel Non-JSON (.xls)",
+                "3. Template Rekening Tahapan (.csv)",
+                "4. Template Rekening Giro / KlikBCA (.csv)"
+            ]
+        else:
+            template_names = [
+                "1. Template AOL Format JSON (.json)  [Rekomendasi]",
+                "2. Template AOL Format Excel Non-JSON (.xls)"
+            ]
+        chk_vars = []
+        for name in template_names:
+            var = tk.BooleanVar(value=True)
+            chk_vars.append(var)
+            ctk.CTkCheckBox(main_f, text=name, variable=var,
+                            font=ctk.CTkFont(family="Inter", size=12),
+                            fg_color=("#3B82F6", "#3B82F6"),
+                            border_color=("#CBD5E1", "#4A5568"),
+                            text_color=("#4F566B", "#A0AABF"),
+                            corner_radius=6).pack(anchor="w", pady=3)
+
+        ctk.CTkFrame(main_f, height=2, fg_color=("#E5E9F2", "#2D3748")).pack(fill="x", pady=10)
+
+        # === SECTION 3: LIVE COUNT ===
+        count_label = ctk.CTkLabel(main_f,
+                                   text=f"Transaksi yang akan diekspor: {total_count} dari {total_count}",
+                                   font=ctk.CTkFont(family="Inter", size=13, weight="bold"),
+                                   text_color=("#10B981", "#10B981"))
+        count_label.pack(anchor="w", pady=(0, 15))
+
+        def update_count(*args):
+            try:
+                fd = datetime.datetime.strptime(from_var.get(), "%d/%m/%Y").date()
+                td = datetime.datetime.strptime(to_var.get(), "%d/%m/%Y").date()
+                cnt = sum(1 for d in tx_dates if fd <= d <= td)
+                count_label.configure(
+                    text=f"Transaksi yang akan diekspor: {cnt} dari {total_count}",
+                    text_color=("#10B981", "#10B981") if cnt > 0 else ("#EF4444", "#EF4444"))
+            except ValueError:
+                count_label.configure(text="Format tanggal tidak valid (DD/MM/YYYY)",
+                                      text_color=("#EF4444", "#EF4444"))
+        from_var.trace_add("write", update_count)
+        to_var.trace_add("write", update_count)
+
+        # === BUTTONS ===
+        btn_frame = ctk.CTkFrame(main_f, fg_color="transparent")
+        btn_frame.pack(fill="x")
+
+        def on_save():
+            selected = [i for i, v in enumerate(chk_vars) if v.get()]
+            if not selected:
+                messagebox.showwarning("Peringatan", "Pilih minimal satu template output.", parent=dialog)
+                return
+            try:
+                fd = datetime.datetime.strptime(from_var.get(), "%d/%m/%Y").date()
+                td = datetime.datetime.strptime(to_var.get(), "%d/%m/%Y").date()
+            except ValueError:
+                messagebox.showwarning("Format Tanggal Salah",
+                                       "Format tanggal harus DD/MM/YYYY.\nContoh: 01/10/2026", parent=dialog)
+                return
+            if fd > td:
+                messagebox.showwarning("Rentang Tidak Valid",
+                                       "Tanggal 'Dari' harus sebelum atau sama dengan tanggal 'Sampai'.", parent=dialog)
+                return
+            cnt = sum(1 for d in tx_dates if fd <= d <= td)
+            if cnt == 0:
+                messagebox.showwarning("Tidak Ada Data",
+                                       "Tidak ada transaksi dalam rentang tanggal yang dipilih.", parent=dialog)
+                return
+            result['date_from'] = fd
+            result['date_to'] = td
+            result['templates'] = selected
+            dialog.destroy()
+
+        def on_cancel():
+            dialog.destroy()
+
+        ctk.CTkButton(btn_frame, text="SIMPAN", width=200, height=42,
+                      font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
+                      fg_color=("#10B981", "#10B981"), hover_color=("#059669", "#059669"),
+                      text_color="white", command=on_save, corner_radius=10).pack(side="left", padx=(0, 15))
+        ctk.CTkButton(btn_frame, text="BATAL", width=120, height=42,
+                      font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
+                      fg_color=("#E5E9F2", "#2D3748"), hover_color=("#CBD5E1", "#4A5568"),
+                      text_color=("#4F566B", "#D3D9E6"), command=on_cancel, corner_radius=10).pack(side="left")
+
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+        dialog.wait_window()
+
+        if 'templates' not in result:
+            return None
+        return result
+
     def finish_saving_panin(self, df_output, invalid_dates_data, num_dummy, filepath):
         try:
-            messagebox.showinfo(
-                "Ekstraksi Berhasil", 
-                f"Ekstraksi {len(df_output) - 3 - num_dummy} data transaksi berhasil.\n\nSilakan pilih lokasi penyimpanan file konversi."
-            )
+            df_tx = df_output.iloc[num_dummy + 1 : len(df_output) - 2]
+            tx_dates = []
+            for _, r in df_tx.iterrows():
+                t_str = str(r[OUTPUT_COLUMNS['tgl']]).strip()
+                try:
+                    dt = datetime.datetime.strptime(t_str, "%d/%m/%Y").date()
+                except Exception:
+                    dt = datetime.date.today()
+                tx_dates.append(dt)
+
+            config = self.show_export_config_dialog("Panin", tx_dates, len(df_tx))
+            if not config:
+                self.update_progress(0)
+                self.log("[INFO] Proses penyimpanan dibatalkan oleh pengguna.")
+                return
+
+            date_from = config['date_from']
+            date_to = config['date_to']
+            chosen_templates = config['templates']
+
+            filtered_indices = [i for i, d in enumerate(tx_dates) if date_from <= d <= date_to]
+            df_filtered_tx = df_tx.iloc[filtered_indices].copy()
+
+            if df_filtered_tx.empty:
+                raise Exception("Tidak ada transaksi dalam rentang tanggal yang dipilih.")
+
+            # Rekalkulasi Saldo Awal, Total Debet, Total Kredit, Saldo Akhir rentang baru
+            first_row = df_filtered_tx.iloc[0]
+            first_bal = float(first_row[OUTPUT_COLUMNS['bal']])
+            first_deb = float(first_row[OUTPUT_COLUMNS['deb']]) if pd.notna(first_row[OUTPUT_COLUMNS['deb']]) and first_row[OUTPUT_COLUMNS['deb']] not in ("", None) else 0.0
+            first_kre = float(first_row[OUTPUT_COLUMNS['kre']]) if pd.notna(first_row[OUTPUT_COLUMNS['kre']]) and first_row[OUTPUT_COLUMNS['kre']] not in ("", None) else 0.0
+            new_saldo_awal = round(first_bal - first_kre + first_deb, 2)
+
+            new_total_debet = round(sum(float(r[OUTPUT_COLUMNS['deb']]) for _, r in df_filtered_tx.iterrows() if pd.notna(r[OUTPUT_COLUMNS['deb']]) and r[OUTPUT_COLUMNS['deb']] not in ("", None)), 2)
+            new_total_kredit = round(sum(float(r[OUTPUT_COLUMNS['kre']]) for _, r in df_filtered_tx.iterrows() if pd.notna(r[OUTPUT_COLUMNS['kre']]) and r[OUTPUT_COLUMNS['kre']] not in ("", None)), 2)
+            new_saldo_akhir = round(float(df_filtered_tx.iloc[-1][OUTPUT_COLUMNS['bal']]), 2)
 
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:panin[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
-            default_name = f"{base_name} (Template AOL Format Excel (Non-JSON)).xls"
+
+            if 1 in chosen_templates:
+                default_name = f"{base_name} (Template AOL Format Excel (Non-JSON)).xls"
+                def_ext = ".xls"
+                file_types = [("Excel 97-2003", "*.xls"), ("Semua File", "*.*")]
+            else:
+                default_name = f"{base_name} (Template AOL Format JSON).json"
+                def_ext = ".json"
+                file_types = [("JSON File", "*.json"), ("Semua File", "*.*")]
+
             save_path = filedialog.asksaveasfilename(
-                defaultextension=".xls", 
-                filetypes=[("Excel 97-2003", "*.xls")], 
-                title="Simpan Format Accurate",
+                defaultextension=def_ext,
+                filetypes=file_types,
+                title="Simpan Format Accurate Panin",
                 initialfile=default_name
             )
-            
-            if save_path:
-                cols = list(OUTPUT_COLUMNS.values())
-                success = save_exact_xls(df_output, save_path, num_dummy, columns=cols)
-                if success:
-                    self.update_progress(1.0)
-                    self.log(f"[OK] Saved: {os.path.basename(save_path)}")
-                    
-                    # === TAMBAHAN: Simpan format JSON AOL ===
-                    json_base = os.path.splitext(save_path)[0]
-                    if "(Template AOL Format Excel (Non-JSON))" in json_base:
-                        json_path = json_base.replace("(Template AOL Format Excel (Non-JSON))", "(Template AOL Format JSON)") + ".json"
-                    else:
-                        json_path = f"{json_base} (Template AOL Format JSON).json"
 
-                    # Ekstrak nomor rekening fallback Panin
-                    rek_panin = getattr(df_output, 'attrs', {}).get("account_number")
-                    if not rek_panin:
-                        rek_match = re.search(r'\b(\d{8,16})\b', os.path.basename(filepath))
-                        rek_panin = rek_match.group(1) if rek_match else "0000000000"
-
-                    saldo_awal_panin = float(df_output.iloc[num_dummy][OUTPUT_COLUMNS['bal']])
-                    saldo_akhir_panin = float(df_output.iloc[-1][OUTPUT_COLUMNS['bal']])
-
-                    df_tx = df_output.iloc[num_dummy + 1 : len(df_output) - 2]
-                    panin_mutation_list = []
-                    for _, r in df_tx.iterrows():
-                        t_date = str(r[OUTPUT_COLUMNS['tgl']]).strip()
-                        desc = str(r[OUTPUT_COLUMNS['desc']]).strip()
-                        deb_str = r[OUTPUT_COLUMNS['deb']]
-                        kre_str = r[OUTPUT_COLUMNS['kre']]
-                        d_val = float(deb_str) if pd.notna(deb_str) and deb_str not in ("", None) else 0.0
-                        k_val = float(kre_str) if pd.notna(kre_str) and kre_str not in ("", None) else 0.0
-                        amt = k_val if k_val > 0 else -d_val
-                        b_val = float(r[OUTPUT_COLUMNS['bal']]) if pd.notna(r[OUTPUT_COLUMNS['bal']]) and r[OUTPUT_COLUMNS['bal']] not in ("", None) else 0.0
-                        panin_mutation_list.append({
-                            "transDate": t_date,
-                            "description": desc,
-                            "amount": amt,
-                            "balance": b_val
-                        })
-
-                    try:
-                        save_aol_json(json_path, rek_panin, saldo_awal_panin, saldo_akhir_panin, panin_mutation_list)
-                        self.log(f"[OK] Panin Template AOL Format JSON Saved: {os.path.basename(json_path)}")
-                    except Exception as json_err:
-                        self.log(f"[WARN] Gagal simpan JSON Panin: {json_err}")
-
-                    audit_table = getattr(df_output, 'attrs', {}).get("audit_table", "")
-                    rekomendasi_txt = "\nSaran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi ini paling stabil dan tidak terpengaruh perubahan format dari pihak bank."
-                    if invalid_dates_data:
-                        error_file = save_invalid_dates(invalid_dates_data, filepath, log_callback=self.log)
-                        msg = f"Dua berkas berhasil disimpan:\n1. Template AOL Format JSON: {os.path.basename(json_path)} [Paling Direkomendasikan]\n2. Template AOL Format Excel (Non-JSON): {os.path.basename(save_path)}\n\nValid: {len(df_tx)} baris | Dummy: {num_dummy} baris\nInvalid Date: {len(invalid_dates_data)} baris (diabaikan){rekomendasi_txt}"
-                        if error_file:
-                            msg += f"\nFile error saved: {os.path.basename(error_file)}"
-                        if audit_table:
-                            msg += f"\n\n{audit_table}"
-                        self.show_copyable_dialog("Selesai dengan Peringatan", msg, path_to_copy=save_path)
-                    else:
-                        msg = f"Dua berkas berhasil disimpan:\n1. Template AOL Format JSON: {os.path.basename(json_path)} [Paling Direkomendasikan]\n2. Template AOL Format Excel (Non-JSON): {os.path.basename(save_path)}\n\nValid: {len(df_tx)} baris | Dummy: {num_dummy} baris{rekomendasi_txt}"
-                        if audit_table:
-                            msg += f"\n\n{audit_table}"
-                        self.show_copyable_dialog("Selesai", msg, path_to_copy=save_path)
-                else:
-                    raise Exception("Penyimpanan file Excel format Accurate gagal.")
-            else:
+            if not save_path:
                 self.update_progress(0)
                 self.log("[INFO] Penyimpanan dibatalkan oleh user.")
                 messagebox.showinfo("Batal", "Penyimpanan file dibatalkan.")
+                return
+
+            base_dir = os.path.dirname(save_path)
+            raw_stem = os.path.splitext(os.path.basename(save_path))[0]
+            clean_stem = re.sub(r'\s*\((?:Template AOL Format (?:Excel \(Non-JSON\)|JSON))\)', '', raw_stem)
+
+            xls_save_path = os.path.join(base_dir, f"{clean_stem} (Template AOL Format Excel (Non-JSON)).xls")
+            json_save_path = os.path.join(base_dir, f"{clean_stem} (Template AOL Format JSON).json")
+
+            saved_files = []
+
+            # 1. Simpan Template 2 (.xls) jika dipilih (Index 1)
+            if 1 in chosen_templates:
+                num_dummy = 7
+                if len(df_filtered_tx) >= num_dummy:
+                    df_dummy = df_filtered_tx.iloc[:num_dummy].copy()
+                else:
+                    rows = []
+                    for i in range(num_dummy):
+                        rows.append(df_filtered_tx.iloc[i % len(df_filtered_tx)].to_dict())
+                    df_dummy = pd.DataFrame(rows)
+
+                row_saldo_awal = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Awal', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: new_saldo_awal}])
+                row_total_mutasi = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Total Mutasi', OUTPUT_COLUMNS['deb']: new_total_debet, OUTPUT_COLUMNS['kre']: new_total_kredit, OUTPUT_COLUMNS['bal']: ""}])
+                row_saldo_akhir = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Akhir', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: new_saldo_akhir}])
+
+                df_output_filtered = pd.concat([df_dummy, row_saldo_awal, df_filtered_tx, row_total_mutasi, row_saldo_akhir], ignore_index=True)
+                cols = list(OUTPUT_COLUMNS.values())
+                success = save_exact_xls(df_output_filtered, xls_save_path, num_dummy, columns=cols)
+                if success:
+                    saved_files.append(f"Template AOL Format Excel (Non-JSON): {os.path.basename(xls_save_path)}")
+                    self.log(f"[OK] Panin Excel Saved: {os.path.basename(xls_save_path)}")
+
+            # 2. Simpan Template 1 (.json) jika dipilih (Index 0)
+            if 0 in chosen_templates:
+                rek_panin = getattr(df_output, 'attrs', {}).get("account_number")
+                if not rek_panin:
+                    rek_match = re.search(r'\b(\d{8,16})\b', os.path.basename(filepath))
+                    rek_panin = rek_match.group(1) if rek_match else "0000000000"
+
+                panin_mutation_list = []
+                for _, r in df_filtered_tx.iterrows():
+                    t_date = str(r[OUTPUT_COLUMNS['tgl']]).strip()
+                    desc = str(r[OUTPUT_COLUMNS['desc']]).strip()
+                    deb_str = r[OUTPUT_COLUMNS['deb']]
+                    kre_str = r[OUTPUT_COLUMNS['kre']]
+                    d_val = float(deb_str) if pd.notna(deb_str) and deb_str not in ("", None) else 0.0
+                    k_val = float(kre_str) if pd.notna(kre_str) and kre_str not in ("", None) else 0.0
+                    amt = k_val if k_val > 0 else -d_val
+                    b_val = float(r[OUTPUT_COLUMNS['bal']]) if pd.notna(r[OUTPUT_COLUMNS['bal']]) and r[OUTPUT_COLUMNS['bal']] not in ("", None) else 0.0
+                    panin_mutation_list.append({
+                        "transDate": t_date,
+                        "description": desc,
+                        "amount": amt,
+                        "balance": b_val
+                    })
+
+                save_aol_json(json_save_path, rek_panin, new_saldo_awal, new_saldo_akhir, panin_mutation_list)
+                saved_files.append(f"Template AOL Format JSON: {os.path.basename(json_save_path)}")
+                self.log(f"[OK] Panin Template AOL Format JSON Saved: {os.path.basename(json_save_path)}")
+
+            self.update_progress(1.0)
+            rekomendasi_txt = "\nSaran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi ini paling stabil dan tidak terpengaruh perubahan format dari pihak bank."
+            files_list_str = "\n".join([f"{idx+1}. {fn}" for idx, fn in enumerate(saved_files)])
+            range_info = f"Rentang Tanggal: {date_from.strftime('%d/%m/%Y')} s/d {date_to.strftime('%d/%m/%Y')}\nTotal Mutasi: {len(df_filtered_tx)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
+
+            if invalid_dates_data:
+                error_file = save_invalid_dates(invalid_dates_data, filepath, log_callback=self.log)
+                msg = f"Berkas berhasil disimpan ({len(saved_files)} file):\n{files_list_str}\n\n{range_info}\nInvalid Date: {len(invalid_dates_data)} baris (diabaikan){rekomendasi_txt}"
+                if error_file:
+                    msg += f"\nFile error saved: {os.path.basename(error_file)}"
+                self.show_copyable_dialog("Selesai dengan Peringatan", msg, path_to_copy=save_path)
+            else:
+                msg = f"Berkas berhasil disimpan ({len(saved_files)} file):\n{files_list_str}\n\n{range_info}{rekomendasi_txt}"
+                self.show_copyable_dialog("Selesai", msg, path_to_copy=save_path)
+
         except Exception as e:
             self.reset_ui_state(is_error=True, error_msg=str(e))
         finally:
@@ -557,105 +763,121 @@ class UniversalAccurateConverter:
 
     def finish_saving_bca_csv(self, transactions, rekening, nama, saldo_awal, saldo_akhir, filepath):
         try:
-            messagebox.showinfo(
-                "Ekstraksi BCA Berhasil", 
-                f"Ekstraksi {len(transactions)} data transaksi BCA berhasil.\n\nSistem akan menyimpan 4 berkas hasil konversi ke dalam satu folder khusus.\n\nSilakan tentukan nama dan lokasi folder penyimpanan."
-            )
+            periode_from_meta = transactions[0].get("_periode_raw", "") if transactions else ""
+            year_match = re.search(r'\b(20\d{2}|19\d{2})\b', periode_from_meta) if periode_from_meta else None
+            if not year_match:
+                year_match = re.search(r'\b(20\d{2}|19\d{2})\b', filepath)
+            effective_year = year_match.group(1) if year_match else str(datetime.datetime.now().year)
+
+            def format_bca_ddmmyyyy(raw_date, year_fallback):
+                d = str(raw_date).replace("'", "").strip()
+                if not d: return ""
+                if "PEND" in d.upper():
+                    for prev_tx in reversed(transactions):
+                        pt = str(prev_tx.get("tanggal", "")).replace("'", "").strip()
+                        if pt and "PEND" not in pt.upper():
+                            p_parts = pt.split('/')
+                            if len(p_parts) == 2:
+                                return f"{int(p_parts[0]):02d}/{int(p_parts[1]):02d}/{year_fallback}"
+                            elif len(p_parts) >= 3:
+                                return f"{int(p_parts[0]):02d}/{int(p_parts[1]):02d}/{p_parts[2]}"
+                    now = datetime.datetime.now()
+                    return f"{now.day:02d}/{now.month:02d}/{year_fallback}"
+                p = d.split('/')
+                if len(p) == 2:
+                    return f"{p[0]:0>2}/{p[1]:0>2}/{year_fallback}"
+                elif len(p) >= 3:
+                    return f"{p[0]:0>2}/{p[1]:0>2}/{p[2]}"
+                return d
+
+            tx_dates = []
+            for tx in transactions:
+                t_clean = format_bca_ddmmyyyy(tx["tanggal"], effective_year)
+                try:
+                    dt = datetime.datetime.strptime(t_clean, "%d/%m/%Y").date()
+                except Exception:
+                    dt = datetime.date.today()
+                tx_dates.append(dt)
+
+            config = self.show_export_config_dialog("BCA", tx_dates, len(transactions))
+            if not config:
+                self.update_progress(0)
+                self.log("[INFO] Proses penyimpanan dibatalkan oleh pengguna.")
+                return
+
+            date_from = config['date_from']
+            date_to = config['date_to']
+            chosen_templates = config['templates']
+
+            filtered_txs = [tx for i, tx in enumerate(transactions) if date_from <= tx_dates[i] <= date_to]
+            if not filtered_txs:
+                raise Exception("Tidak ada transaksi dalam rentang tanggal yang dipilih.")
+
+            first_tx = filtered_txs[0]
+            first_bal = float(first_tx["saldo"])
+            first_mut = float(first_tx["mutasi"])
+            if first_tx["tipe"] == "CR":
+                new_saldo_awal = round(first_bal - first_mut, 2)
+            else:
+                new_saldo_awal = round(first_bal + first_mut, 2)
+
+            new_total_debet = round(sum(tx["mutasi"] for tx in filtered_txs if tx["tipe"] == "DB"), 2)
+            new_total_kredit = round(sum(tx["mutasi"] for tx in filtered_txs if tx["tipe"] == "CR"), 2)
+            new_saldo_akhir = round(float(filtered_txs[-1]["saldo"]), 2)
+
             base_name = os.path.splitext(os.path.basename(filepath))[0]
             base_name = re.sub(r'^(?:bca[\s\_-]*)+', '', base_name, flags=re.IGNORECASE)
             default_name = f"BCA_{base_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}"
-            
+
             save_path_raw = filedialog.asksaveasfilename(
-                defaultextension="", 
-                filetypes=[("Folder Penyimpanan", "*.*")], 
+                defaultextension="",
+                filetypes=[("Folder Penyimpanan", "*.*")],
                 title="Simpan Format Accurate BCA (Akan dibuatkan Folder)",
                 initialfile=default_name
             )
-            
-            if save_path_raw:
-                parent_dir = os.path.dirname(save_path_raw)
-                chosen_basename = os.path.splitext(os.path.basename(save_path_raw))[0]
-                
-                # Buat folder khusus
-                folder_name = f"Hasil Konversi BCA - {chosen_basename}"
-                target_dir = os.path.join(parent_dir, folder_name)
-                os.makedirs(target_dir, exist_ok=True)
-                
-                # Definisikan 4 path file baru dengan urutan resmi
-                aol_json_path = os.path.join(target_dir, f"{chosen_basename} (1 - Template AOL Format JSON).json")
-                backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Template AOL Format Excel (Non-JSON)).xls")
-                save_path = os.path.join(target_dir, f"{chosen_basename} (3 - Template Rekening Tahapan).csv")
-                klikbca_path = os.path.join(target_dir, f"{chosen_basename} (4 - Template Rekening Giro).csv")
-                # === PRIMARY: Save CSV (for Accurate import) ===
-                with open(save_path, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f, lineterminator='\n')
-                    safe_nama = nama.replace(',', ' ').replace('"', '')
-                    writer.writerow(["No. Rekening", "=", f"'{rekening}"])
-                    writer.writerow(["Nama", "=", safe_nama])
-                    writer.writerow(["Mata Uang", "=", "IDR"])
-                    writer.writerow([])
-                    writer.writerow(["Tanggal", "Keterangan", "Cabang", "Jumlah", "", "Saldo"])
-                    
-                    total_kredit = 0.0
-                    total_debet = 0.0
-                    for tx in transactions:
-                        if tx["tipe"] == "CR": total_kredit += tx["mutasi"]
-                        else: total_debet += tx["mutasi"]
-                        
-                        safe_ket = tx["keterangan"].replace(',', ' ').replace('"', '')
-                        tgl_raw = tx["tanggal"].replace("'", "").strip()
-                        parts = tgl_raw.split('/')
-                        tgl_fmt1 = f"'{parts[0]:0>2}/{parts[1]:0>2}" if len(parts) >= 2 else f"'{tgl_raw}"
-                        
-                        writer.writerow([
-                            tgl_fmt1,
-                            safe_ket,
-                            tx["cabang"],
-                            f"{tx['mutasi']:.2f}",
-                            tx["tipe"],
-                            f"{tx['saldo']:.2f}"
-                        ])
-                    
-                    writer.writerow(["Saldo Awal", "=", f"{saldo_awal:.2f}"])
-                    writer.writerow(["Kredit", "=", f"{total_kredit:.2f}"])
-                    writer.writerow(["Debet", "=", f"{total_debet:.2f}"])
-                    writer.writerow(["Saldo Akhir", "=", f"{saldo_akhir:.2f}"])
-                    writer.writerow([])
 
-                # Hitung tahun efektif dari metadata dokumen jika tersedia (hindari hardcode tahun sekarang)
-                periode_from_meta = transactions[0].get("_periode_raw", "") if transactions else ""
-                year_match = re.search(r'\b(20\d{2}|19\d{2})\b', periode_from_meta) if periode_from_meta else None
-                if not year_match:
-                    year_match = re.search(r'\b(20\d{2}|19\d{2})\b', filepath)
-                effective_year = year_match.group(1) if year_match else str(datetime.datetime.now().year)
+            if not save_path_raw:
+                self.update_progress(0)
+                self.log("[INFO] Penyimpanan dibatalkan oleh user.")
+                messagebox.showinfo("Batal", "Penyimpanan file dibatalkan.")
+                return
 
-                def format_bca_ddmmyyyy(raw_date, year_fallback):
-                    d = str(raw_date).replace("'", "").strip()
-                    if not d: return ""
-                    if "PEND" in d.upper():
-                        for prev_tx in reversed(transactions):
-                            pt = str(prev_tx.get("tanggal", "")).replace("'", "").strip()
-                            if pt and "PEND" not in pt.upper():
-                                p_parts = pt.split('/')
-                                if len(p_parts) == 2:
-                                    return f"{int(p_parts[0]):02d}/{int(p_parts[1]):02d}/{year_fallback}"
-                                elif len(p_parts) >= 3:
-                                    return f"{int(p_parts[0]):02d}/{int(p_parts[1]):02d}/{p_parts[2]}"
-                        now = datetime.datetime.now()
-                        return f"{now.day:02d}/{now.month:02d}/{year_fallback}"
-                    p = d.split('/')
-                    if len(p) == 2:
-                        return f"{p[0]:0>2}/{p[1]:0>2}/{year_fallback}"
-                    elif len(p) >= 3:
-                        return f"{p[0]:0>2}/{p[1]:0>2}/{p[2]}"
-                    return d
+            parent_dir = os.path.dirname(save_path_raw)
+            chosen_basename = os.path.splitext(os.path.basename(save_path_raw))[0]
 
-                # === BACKUP: Save XLS ===
-                import pandas as pd
+            folder_name = f"Hasil Konversi BCA - {chosen_basename}"
+            target_dir = os.path.join(parent_dir, folder_name)
+            os.makedirs(target_dir, exist_ok=True)
+
+            aol_json_path = os.path.join(target_dir, f"{chosen_basename} (1 - Template AOL Format JSON).json")
+            backup_path = os.path.join(target_dir, f"{chosen_basename} (2 - Template AOL Format Excel (Non-JSON)).xls")
+            save_path = os.path.join(target_dir, f"{chosen_basename} (3 - Template Rekening Tahapan).csv")
+            klikbca_path = os.path.join(target_dir, f"{chosen_basename} (4 - Template Rekening Giro).csv")
+
+            saved_files = []
+
+            # 1. Template 1: AOL JSON (Index 0)
+            if 0 in chosen_templates:
+                bca_mutation_list = []
+                for tx in filtered_txs:
+                    tgl_clean = format_bca_ddmmyyyy(tx["tanggal"], effective_year)
+                    mut = float(tx["mutasi"])
+                    amt = mut if tx["tipe"] == "CR" else -mut
+                    bca_mutation_list.append({
+                        "transDate": tgl_clean,
+                        "description": tx["keterangan"],
+                        "amount": amt,
+                        "balance": float(tx["saldo"])
+                    })
+                save_aol_json(aol_json_path, rekening, new_saldo_awal, new_saldo_akhir, bca_mutation_list)
+                saved_files.append("1. Template AOL Format JSON (.json)  [Paling Direkomendasikan]")
+                self.log(f"[OK] BCA Template AOL Format JSON: {os.path.basename(aol_json_path)}")
+
+            # 2. Template 2: AOL Excel Non-JSON (Index 1)
+            if 1 in chosen_templates:
                 cols = list(OUTPUT_COLUMNS.values())
                 final_data = []
-                
-                for tx in transactions:
+                for tx in filtered_txs:
                     tgl_clean = format_bca_ddmmyyyy(tx["tanggal"], effective_year)
                     debet_val = tx['mutasi'] if tx["tipe"] == "DB" else ""
                     kredit_val = tx['mutasi'] if tx["tipe"] == "CR" else ""
@@ -666,10 +888,9 @@ class UniversalAccurateConverter:
                         OUTPUT_COLUMNS['kre']: kredit_val,
                         OUTPUT_COLUMNS['bal']: tx['saldo']
                     })
-                
+
                 df_final = pd.DataFrame(final_data)
                 num_dummy = 7
-                # Loop ulang data transaksi sampai genap 7 baris
                 if len(df_final) >= num_dummy:
                     df_dummy = df_final.iloc[:num_dummy].copy()
                 else:
@@ -677,115 +898,99 @@ class UniversalAccurateConverter:
                     for i in range(num_dummy):
                         rows.append(df_final.iloc[i % len(df_final)].to_dict())
                     df_dummy = pd.DataFrame(rows)
-                self.log(f"Menambahkan {num_dummy} baris dummy (Looping Transaksi Format Accurate).")
 
-                row_saldo_awal = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Awal', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: saldo_awal}])
-                row_total_mutasi = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Total Mutasi', OUTPUT_COLUMNS['deb']: total_debet, OUTPUT_COLUMNS['kre']: total_kredit, OUTPUT_COLUMNS['bal']: ""}])
-                row_saldo_akhir = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Akhir', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: saldo_akhir}])
-                
+                row_saldo_awal = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Awal', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: new_saldo_awal}])
+                row_total_mutasi = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Total Mutasi', OUTPUT_COLUMNS['deb']: new_total_debet, OUTPUT_COLUMNS['kre']: new_total_kredit, OUTPUT_COLUMNS['bal']: ""}])
+                row_saldo_akhir = pd.DataFrame([{OUTPUT_COLUMNS['tgl']: '', OUTPUT_COLUMNS['desc']: 'Saldo Akhir', OUTPUT_COLUMNS['deb']: "", OUTPUT_COLUMNS['kre']: "", OUTPUT_COLUMNS['bal']: new_saldo_akhir}])
+
                 df_output = pd.concat([df_dummy, row_saldo_awal, df_final, row_total_mutasi, row_saldo_akhir], ignore_index=True)
-
-                # backup_path sudah didefinisikan di atas (sebagai Template AOL Format Excel (Non-JSON))
                 save_exact_xls(df_output, backup_path, num_dummy, columns=cols)
-                
-                # === FORMAT 4 (File CSV): CSV Rekening Giro (myBCA / KlikBCA) ===
-                # klikbca_path sudah didefinisikan di atas
-                
+                saved_files.append("2. Template AOL Format Excel (Non-JSON) (.xls)")
+                self.log(f"[OK] BCA Template AOL Format Excel (Non-JSON): {os.path.basename(backup_path)}")
+
+            # 3. Template 3: Rekening Tahapan CSV (Index 2)
+            if 2 in chosen_templates:
+                with open(save_path, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f, lineterminator='\n')
+                    safe_nama = nama.replace(',', ' ').replace('"', '')
+                    writer.writerow(["No. Rekening", "=", f"'{rekening}"])
+                    writer.writerow(["Nama", "=", safe_nama])
+                    writer.writerow(["Mata Uang", "=", "IDR"])
+                    writer.writerow([])
+                    writer.writerow(["Tanggal", "Keterangan", "Cabang", "Jumlah", "", "Saldo"])
+
+                    for tx in filtered_txs:
+                        safe_ket = tx["keterangan"].replace(',', ' ').replace('"', '')
+                        tgl_raw = tx["tanggal"].replace("'", "").strip()
+                        parts = tgl_raw.split('/')
+                        tgl_fmt1 = f"'{parts[0]:0>2}/{parts[1]:0>2}" if len(parts) >= 2 else f"'{tgl_raw}"
+                        writer.writerow([
+                            tgl_fmt1,
+                            safe_ket,
+                            tx["cabang"],
+                            f"{tx['mutasi']:.2f}",
+                            tx["tipe"],
+                            f"{tx['saldo']:.2f}"
+                        ])
+
+                    writer.writerow(["Saldo Awal", "=", f"{new_saldo_awal:.2f}"])
+                    writer.writerow(["Kredit", "=", f"{new_total_kredit:.2f}"])
+                    writer.writerow(["Debet", "=", f"{new_total_debet:.2f}"])
+                    writer.writerow(["Saldo Akhir", "=", f"{new_saldo_akhir:.2f}"])
+                    writer.writerow([])
+                saved_files.append("3. Template Rekening Tahapan (.csv)")
+                self.log(f"[OK] BCA Template Rekening Tahapan: {os.path.basename(save_path)}")
+
+            # 4. Template 4: Rekening Giro CSV (Index 3)
+            if 3 in chosen_templates:
                 with open(klikbca_path, 'w', newline='', encoding='utf-8') as f:
-                    # Baris 1: Header judul (MANUAL write karena field ke-6 kosong tanpa kutip)
-                    f.write('"Informasi Rekening - Mutasi Rekening"," "," "," "," ",\n')
-                    
-                    # Baris 2: Baris kosong
-                    f.write('\n')
-                    
-                    # Baris 3-6: Metadata (single-cell strings)
+                    f.write('"Informasi Rekening - Mutasi Rekening"," "," "," "," ",\n\n')
                     writer3 = csv.writer(f, lineterminator='\n', quoting=csv.QUOTE_ALL)
-                    
-                    if periode_from_meta:
-                        # Dari dokumen input: gunakan periode asli
-                        periode_str = periode_from_meta
-                    else:
-                        # Hitung dari tanggal transaksi dengan tahun efektif
-                        dates = []
-                        for tx in transactions:
-                            raw = tx["tanggal"].replace("'", "")
-                            dates.append(raw)
-                        if dates:
-                            full_dates = [format_bca_ddmmyyyy(d, effective_year) for d in dates]
-                            tgl_awal = full_dates[0]
-                            tgl_akhir = full_dates[-1]
-                        else:
-                            tgl_awal = f"01/01/{effective_year}"
-                            tgl_akhir = f"31/12/{effective_year}"
-                        periode_str = f"{tgl_awal} - {tgl_akhir}"
-                    
+                    safe_nama = nama.replace(',', ' ').replace('"', '')
+                    periode_str = f"{date_from.strftime('%d/%m/%Y')} - {date_to.strftime('%d/%m/%Y')}"
+
                     writer3.writerow([f"No. rekening : {rekening}"])
                     writer3.writerow([f"Nama : {safe_nama}"])
                     writer3.writerow([f"Periode : {periode_str}"])
                     writer3.writerow(["Kode Mata Uang : Rp"])
-                    
-                    # Baris 7: Header tabel
                     writer3.writerow(["Tanggal Transaksi", "Keterangan", "Cabang", "Jumlah", "Saldo"])
-                    
-                    # Baris 8+: Data transaksi
+
                     count_cr = 0
                     count_db = 0
-                    for tx in transactions:
+                    for tx in filtered_txs:
                         tgl_clean = format_bca_ddmmyyyy(tx["tanggal"], effective_year)
                         cabang_clean = tx["cabang"].replace("'", "")
                         jumlah_str = f"{tx['mutasi']:,.2f} {tx['tipe']}"
                         saldo_str = f"{tx['saldo']:,.2f}"
-                        
                         if tx["tipe"] == "CR":
                             count_cr += 1
                         else:
                             count_db += 1
-                        
                         writer3.writerow([tgl_clean, tx["keterangan"], cabang_clean, jumlah_str, saldo_str])
-                    
-                    # Footer
-                    writer3.writerow([f"Saldo Awal : {saldo_awal:,.2f}"])
-                    writer3.writerow([f"Mutasi Debet : {total_debet:,.2f}", str(count_db)])
-                    writer3.writerow([f"Mutasi Kredit : {total_kredit:,.2f}", str(count_cr)])
-                    writer3.writerow([f"Saldo Akhir : {saldo_akhir:,.2f}"])
-                    f.write('\n')  # 1 baris kosong penutup (writerow sudah menambahkan \n)
 
-                # === FORMAT 4: Accurate Online (AOL) JSON ===
-                bca_mutation_list = []
-                for tx in transactions:
-                    tgl_clean = format_bca_ddmmyyyy(tx["tanggal"], effective_year)
-                    mut = float(tx["mutasi"])
-                    amt = mut if tx["tipe"] == "CR" else -mut
-                    bca_mutation_list.append({
-                        "transDate": tgl_clean,
-                        "description": tx["keterangan"],
-                        "amount": amt,
-                        "balance": float(tx["saldo"])
-                    })
-                save_aol_json(aol_json_path, rekening, saldo_awal, saldo_akhir, bca_mutation_list)
-
-                self.update_progress(1.0)
-                self.log(f"[OK] BCA Template AOL Format JSON: {os.path.basename(aol_json_path)}")
-                self.log(f"[OK] BCA Template AOL Format Excel (Non-JSON): {os.path.basename(backup_path)}")
-                self.log(f"[OK] BCA Template Rekening Tahapan: {os.path.basename(save_path)}")
+                    writer3.writerow([f"Saldo Awal : {new_saldo_awal:,.2f}"])
+                    writer3.writerow([f"Mutasi Debet : {new_total_debet:,.2f}", str(count_db)])
+                    writer3.writerow([f"Mutasi Kredit : {new_total_kredit:,.2f}", str(count_cr)])
+                    writer3.writerow([f"Saldo Akhir : {new_saldo_akhir:,.2f}"])
+                    f.write('\n')
+                saved_files.append("4. Template Rekening Giro (myBCA / KlikBCA) (.csv)")
                 self.log(f"[OK] BCA Template Rekening Giro: {os.path.basename(klikbca_path)}")
-                audit_table = transactions[0].get("_audit_table", "") if transactions else ""
-                msg = (
-                    f"Empat berkas hasil konversi BCA berhasil disimpan dalam folder:\n{target_dir}\n\n"
-                    f"1. Template AOL Format JSON (.json)  [Paling Direkomendasikan]\n"
-                    f"2. Template AOL Format Excel (Non-JSON) (.xls)\n"
-                    f"3. Template Rekening Tahapan (.csv)\n"
-                    f"4. Template Rekening Giro (myBCA / KlikBCA) (.csv)\n\n"
-                    f"Total Data: {len(transactions)} baris mutasi\n\n"
-                    f"Saran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi Accurate ini paling stabil, baku, dan jarang terpengaruh perubahan tata letak dari pihak bank."
-                )
-                if audit_table:
-                    msg += f"\n\n{audit_table}"
-                self.show_copyable_dialog("Selesai BCA", msg, path_to_copy=target_dir)
-            else:
-                self.update_progress(0)
-                self.log("[INFO] Penyimpanan dibatalkan oleh user.")
-                messagebox.showinfo("Batal", "Penyimpanan file dibatalkan.")
+
+            self.update_progress(1.0)
+            files_list_str = "\n".join(saved_files)
+            range_info = f"Rentang Tanggal: {date_from.strftime('%d/%m/%Y')} s/d {date_to.strftime('%d/%m/%Y')}\nTotal Mutasi: {len(filtered_txs)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
+            audit_table = transactions[0].get("_audit_table", "") if transactions else ""
+
+            msg = (
+                f"Berkas hasil konversi BCA berhasil disimpan ke folder:\n{target_dir}\n\n"
+                f"Template Terpilih ({len(saved_files)} berkas):\n{files_list_str}\n\n"
+                f"{range_info}\n\n"
+                f"Saran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi Accurate ini paling stabil, baku, dan jarang terpengaruh perubahan tata letak dari pihak bank."
+            )
+            if audit_table:
+                msg += f"\n\n{audit_table}"
+            self.show_copyable_dialog("Selesai BCA", msg, path_to_copy=target_dir)
+
         except Exception as e:
             self.reset_ui_state(is_error=True, error_msg=f"Gagal simpan BCA File: {str(e)}")
         finally:
