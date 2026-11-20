@@ -155,13 +155,20 @@ def validate_bank_selection(filepath: str, selected_bank: str) -> tuple[bool, st
 
     # Kasus 1: Bank terdeteksi dan TIDAK cocok dengan bank yang dipilih
     if detected_bank and detected_bank.lower() != selected_bank.lower():
-        msg = (
-            f"File yang Anda pilih terdeteksi sebagai dokumen mutasi Bank {detected_bank}, "
-            f"bukan Bank {selected_bank}.\n\n"
-            f"Keterangan: {reason}\n\n"
-            f"Sistem menolak memproses untuk mencegah data rusak pada format Accurate.\n"
-            f"Silakan ubah pilihan bank menjadi '{detected_bank}' pada menu di sudut kanan atas."
-        )
+        if detected_bank in ["Mandiri", "BRI", "BNI"]:
+            msg = (
+                f"File yang Anda pilih terdeteksi sebagai dokumen mutasi Bank {detected_bank}.\n\n"
+                f"Keterangan: {reason}\n\n"
+                f"Aplikasi saat ini hanya mendukung konversi mutasi Bank BCA dan Bank Panin."
+            )
+        else:
+            msg = (
+                f"File yang Anda pilih terdeteksi sebagai dokumen mutasi Bank {detected_bank}, "
+                f"bukan Bank {selected_bank}.\n\n"
+                f"Keterangan: {reason}\n\n"
+                f"Sistem menolak memproses untuk mencegah data rusak pada format Accurate.\n"
+                f"Silakan ubah pilihan bank menjadi '{detected_bank}' pada menu di sudut kanan atas."
+            )
         return False, msg, detected_bank
 
     # Kasus 2: Bank terdeteksi dan COCOK dengan bank yang dipilih

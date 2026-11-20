@@ -188,8 +188,8 @@ class UniversalAccurateConverter:
         
         ctk.CTkLabel(controls_frame, text="Pilihan Bank:", font=ctk.CTkFont(family="Inter", size=12, weight="bold"), text_color=("#4F566B", "#D3D9E6")).pack(side="left", padx=(0, 10))
         
-        self.bank_var = ctk.StringVar(value="Panin")
-        self.bank_menu = ctk.CTkOptionMenu(controls_frame, values=["Panin", "BCA", "Mandiri"],
+        self.bank_var = ctk.StringVar(value="BCA")
+        self.bank_menu = ctk.CTkOptionMenu(controls_frame, values=["BCA", "Panin"],
                                            variable=self.bank_var, command=self.change_bank,
                                            font=ctk.CTkFont(family="Inter", size=13, weight="bold"),
                                            fg_color=("#E3E8EE", "#2D3748"),
@@ -224,7 +224,7 @@ class UniversalAccurateConverter:
 
         self.path_var = tk.StringVar()
         self.entry_path = ctk.CTkEntry(file_frame, textvariable=self.path_var, width=600, height=45,
-                                       placeholder_text="Pilih file mutasi (Panin: .xls/.xlsx/.csv/.pdf | BCA: .pdf/.csv/.xlsx/.xls)...",
+                                       placeholder_text="Pilih file mutasi (BCA: .pdf/.csv/.xlsx/.xls | Panin: .xls/.xlsx/.csv/.pdf)...",
                                        font=ctk.CTkFont(family="Inter", size=13),
                                        border_color=("#E5E9F2", "#4A5568"), border_width=2,
                                        fg_color=("#F9FAFB", "#2D3748"), corner_radius=10)
@@ -274,7 +274,7 @@ class UniversalAccurateConverter:
         self.log_area.pack(fill="both", expand=True, padx=35, pady=(5, 25))
         self.log_area.configure(state="disabled")
         
-        self.change_bank("Panin")
+        self.change_bank("BCA")
 
     def log(self, msg):
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
@@ -315,7 +315,10 @@ class UniversalAccurateConverter:
             if detected:
                 current_bank = self.bank_var.get()
                 if detected.lower() != current_bank.lower():
-                    self.log(f"[Peringatan] File ini terdeteksi sebagai mutasi Bank {detected}! Pilihan menu saat ini adalah '{current_bank}'. Pastikan ubah pilihan bank sebelum proses.")
+                    if detected in ["BCA", "Panin"]:
+                        self.log(f"[Peringatan] File ini terdeteksi sebagai mutasi Bank {detected}! Pilihan menu saat ini adalah '{current_bank}'. Pastikan ubah pilihan bank sebelum proses.")
+                    else:
+                        self.log(f"[Peringatan] File ini terdeteksi sebagai dokumen Bank {detected}! Aplikasi saat ini hanya mendukung Bank BCA dan Panin.")
                 else:
                     self.log(f"[Info] {desc} ({detected}).")
 
