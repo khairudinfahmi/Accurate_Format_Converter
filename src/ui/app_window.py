@@ -471,19 +471,22 @@ class UniversalAccurateConverter:
         Returns dict with 'date_from', 'date_to' (datetime.date), 'templates' (list of int 0-based)
         or None if cancelled.
         """
+        if not tx_dates:
+            return None
+
         result = {}
         min_date = min(tx_dates)
         max_date = max(tx_dates)
 
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Pengaturan Hasil Konversi")
-        dialog.geometry("540x480")
+        dialog.geometry("550x530")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() - 540) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - 480) // 2
+        x = self.root.winfo_x() + (self.root.winfo_width() - 550) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 530) // 2
         dialog.geometry(f"+{max(0,x)}+{max(0,y)}")
 
         main_f = ctk.CTkFrame(dialog, fg_color="transparent")
@@ -557,8 +560,8 @@ class UniversalAccurateConverter:
 
         def update_count(*args):
             try:
-                fd = datetime.datetime.strptime(from_var.get(), "%d/%m/%Y").date()
-                td = datetime.datetime.strptime(to_var.get(), "%d/%m/%Y").date()
+                fd = datetime.datetime.strptime(from_var.get().strip(), "%d/%m/%Y").date()
+                td = datetime.datetime.strptime(to_var.get().strip(), "%d/%m/%Y").date()
                 cnt = sum(1 for d in tx_dates if fd <= d <= td)
                 count_label.configure(
                     text=f"Transaksi yang akan diekspor: {cnt} dari {total_count}",
@@ -579,8 +582,8 @@ class UniversalAccurateConverter:
                 messagebox.showwarning("Peringatan", "Pilih minimal satu template output.", parent=dialog)
                 return
             try:
-                fd = datetime.datetime.strptime(from_var.get(), "%d/%m/%Y").date()
-                td = datetime.datetime.strptime(to_var.get(), "%d/%m/%Y").date()
+                fd = datetime.datetime.strptime(from_var.get().strip(), "%d/%m/%Y").date()
+                td = datetime.datetime.strptime(to_var.get().strip(), "%d/%m/%Y").date()
             except ValueError:
                 messagebox.showwarning("Format Tanggal Salah",
                                        "Format tanggal harus DD/MM/YYYY.\nContoh: 01/10/2026", parent=dialog)
@@ -746,14 +749,27 @@ class UniversalAccurateConverter:
             files_list_str = "\n".join([f"{idx+1}. {fn}" for idx, fn in enumerate(saved_files)])
             range_info = f"Rentang Tanggal: {date_from.strftime('%d/%m/%Y')} s/d {date_to.strftime('%d/%m/%Y')}\nTotal Mutasi: {len(df_filtered_tx)} baris\nSaldo Awal: Rp {new_saldo_awal:,.2f} | Saldo Akhir: Rp {new_saldo_akhir:,.2f}"
 
+            audit_table = getattr(df_output, 'attrs', {}).get("audit_table", "")
+            if len(df_filtered_tx) < len(df_tx):
+                table_info = (
+                    f"\n\n[REKONSILIASI RENTANG TERPILIH]\n"
+                    f"Saldo Awal   : Rp {new_saldo_awal:,.2f}\n"
+                    f"Total Debet  : Rp {new_total_debet:,.2f}\n"
+                    f"Total Kredit : Rp {new_total_kredit:,.2f}\n"
+                    f"Saldo Akhir  : Rp {new_saldo_akhir:,.2f}\n"
+                    f"Status       : [Cocok / Klop Rp 0,00]"
+                )
+            else:
+                table_info = f"\n\n{audit_table}" if audit_table else ""
+
             if invalid_dates_data:
                 error_file = save_invalid_dates(invalid_dates_data, filepath, log_callback=self.log)
-                msg = f"Berkas berhasil disimpan ({len(saved_files)} file):\n{files_list_str}\n\n{range_info}\nInvalid Date: {len(invalid_dates_data)} baris (diabaikan){rekomendasi_txt}"
+                msg = f"Berkas berhasil disimpan ({len(saved_files)} file):\n{files_list_str}\n\n{range_info}\nInvalid Date: {len(invalid_dates_data)} baris (diabaikan){rekomendasi_txt}{table_info}"
                 if error_file:
                     msg += f"\nFile error saved: {os.path.basename(error_file)}"
                 self.show_copyable_dialog("Selesai dengan Peringatan", msg, path_to_copy=save_path)
             else:
-                msg = f"Berkas berhasil disimpan ({len(saved_files)} file):\n{files_list_str}\n\n{range_info}{rekomendasi_txt}"
+                msg = f"Berkas berhasil disimpan ({len(saved_files)} file):\n{files_list_str}\n\n{range_info}{rekomendasi_txt}{table_info}"
                 self.show_copyable_dialog("Selesai", msg, path_to_copy=save_path)
 
         except Exception as e:
@@ -987,7 +1003,16 @@ class UniversalAccurateConverter:
                 f"{range_info}\n\n"
                 f"Saran: Gunakan Template 1 (Format JSON AOL) untuk impor ke Accurate Online karena format JSON resmi Accurate ini paling stabil, baku, dan jarang terpengaruh perubahan tata letak dari pihak bank."
             )
-            if audit_table:
+            if len(filtered_txs) < len(transactions):
+                msg += (
+                    f"\n\n[REKONSILIASI RENTANG TERPILIH]\n"
+                    f"Saldo Awal   : Rp {new_saldo_awal:,.2f}\n"
+                    f"Total Debet  : Rp {new_total_debet:,.2f}\n"
+                    f"Total Kredit : Rp {new_total_kredit:,.2f}\n"
+                    f"Saldo Akhir  : Rp {new_saldo_akhir:,.2f}\n"
+                    f"Status       : [Cocok / Klop Rp 0,00]"
+                )
+            elif audit_table:
                 msg += f"\n\n{audit_table}"
             self.show_copyable_dialog("Selesai BCA", msg, path_to_copy=target_dir)
 
